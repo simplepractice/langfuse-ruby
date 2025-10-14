@@ -1,0 +1,29 @@
+# RSpec
+.rspec_status
+
+# Coverage
+coverage/
+
+# Bundler
+Gemfile.lock
+.bundle/
+vendor/bundle/
+
+# Gem build artifacts
+*.gem
+pkg/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
