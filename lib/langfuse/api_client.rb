@@ -51,6 +51,29 @@ module Langfuse
       end
     end
 
+    # Fetch a prompt from the Langfuse API
+    #
+    # @param name [String] The name of the prompt
+    # @param version [Integer, nil] Optional specific version number
+    # @param label [String, nil] Optional label (e.g., "production", "latest")
+    # @return [Hash] The prompt data
+    # @raise [ArgumentError] if both version and label are provided
+    # @raise [NotFoundError] if the prompt is not found
+    # @raise [UnauthorizedError] if authentication fails
+    # @raise [ApiError] for other API errors
+    def get_prompt(name, version: nil, label: nil)
+      raise ArgumentError, "Cannot specify both version and label" if version && label
+
+      params = build_prompt_params(version: version, label: label)
+      path = "/api/public/v2/prompts/#{name}"
+
+      response = connection.get(path, params)
+      handle_response(response)
+    rescue Faraday::Error => e
+      logger.error("Faraday error: #{e.message}")
+      raise ApiError, "HTTP request failed: #{e.message}"
+    end
+
     private
 
     # Build a new Faraday connection
@@ -93,6 +116,49 @@ module Langfuse
     # @return [String]
     def user_agent
       "langfuse-ruby/#{Langfuse::VERSION}"
+    end
+
+    # Build query parameters for prompt request
+    #
+    # @param version [Integer, nil] Optional version number
+    # @param label [String, nil] Optional label
+    # @return [Hash] Query parameters
+    def build_prompt_params(version: nil, label: nil)
+      params = {}
+      params[:version] = version if version
+      params[:label] = label if label
+      params
+    end
+
+    # Handle HTTP response and raise appropriate errors
+    #
+    # @param response [Faraday::Response] The HTTP response
+    # @return [Hash] The parsed response body
+    # @raise [NotFoundError] if status is 404
+    # @raise [UnauthorizedError] if status is 401
+    # @raise [ApiError] for other error statuses
+    def handle_response(response)
+      case response.status
+      when 200
+        response.body
+      when 401
+        raise UnauthorizedError, "Authentication failed. Check your API keys."
+      when 404
+        raise NotFoundError, "Prompt not found"
+      else
+        error_message = extract_error_message(response)
+        raise ApiError, "API request failed (#{response.status}): #{error_message}"
+      end
+    end
+
+    # Extract error message from response body
+    #
+    # @param response [Faraday::Response] The HTTP response
+    # @return [String] The error message
+    def extract_error_message(response)
+      return "Unknown error" unless response.body.is_a?(Hash)
+
+      response.body["message"] || response.body["error"] || "Unknown error"
     end
   end
 end

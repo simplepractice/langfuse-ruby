@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(bundle exec rspec:*)",
-      "Bash(bundle exec:*)"
+      "Bash(bundle exec:*)",
+      "Bash(bundle install)"
     ],
     "deny": [],
     "ask": []

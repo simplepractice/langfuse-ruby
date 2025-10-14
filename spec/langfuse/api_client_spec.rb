@@ -167,4 +167,155 @@ RSpec.describe Langfuse::ApiClient do
       expect(conn.adapter).to eq(Faraday::Adapter::NetHttp)
     end
   end
+
+  describe "#get_prompt" do
+    let(:prompt_name) { "greeting" }
+    let(:prompt_response) do
+      {
+        "id" => "prompt-123",
+        "name" => "greeting",
+        "version" => 1,
+        "prompt" => "Hello {{name}}!",
+        "type" => "text",
+        "labels" => ["production"]
+      }
+    end
+
+    context "with successful response" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .to_return(
+            status: 200,
+            body: prompt_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "fetches a prompt by name" do
+        result = api_client.get_prompt(prompt_name)
+        expect(result).to eq(prompt_response)
+      end
+
+      it "makes a GET request to the correct endpoint" do
+        api_client.get_prompt(prompt_name)
+        expect(
+          a_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+        ).to have_been_made.once
+      end
+    end
+
+    context "with version parameter" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .with(query: { version: "2" })
+          .to_return(
+            status: 200,
+            body: prompt_response.merge("version" => 2).to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "includes version in query parameters" do
+        result = api_client.get_prompt(prompt_name, version: 2)
+        expect(result["version"]).to eq(2)
+      end
+
+      it "makes request with version parameter" do
+        api_client.get_prompt(prompt_name, version: 2)
+        expect(
+          a_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+            .with(query: { version: "2" })
+        ).to have_been_made.once
+      end
+    end
+
+    context "with label parameter" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .with(query: { label: "production" })
+          .to_return(
+            status: 200,
+            body: prompt_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "includes label in query parameters" do
+        result = api_client.get_prompt(prompt_name, label: "production")
+        expect(result["labels"]).to include("production")
+      end
+
+      it "makes request with label parameter" do
+        api_client.get_prompt(prompt_name, label: "production")
+        expect(
+          a_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+            .with(query: { label: "production" })
+        ).to have_been_made.once
+      end
+    end
+
+    context "with both version and label" do
+      it "raises ArgumentError" do
+        expect do
+          api_client.get_prompt(prompt_name, version: 2, label: "production")
+        end.to raise_error(ArgumentError, "Cannot specify both version and label")
+      end
+    end
+
+    context "when prompt is not found" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .to_return(status: 404, body: { message: "Not found" }.to_json)
+      end
+
+      it "raises NotFoundError" do
+        expect do
+          api_client.get_prompt(prompt_name)
+        end.to raise_error(Langfuse::NotFoundError, "Prompt not found")
+      end
+    end
+
+    context "when authentication fails" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .to_return(status: 401, body: { message: "Unauthorized" }.to_json)
+      end
+
+      it "raises UnauthorizedError" do
+        expect do
+          api_client.get_prompt(prompt_name)
+        end.to raise_error(Langfuse::UnauthorizedError, "Authentication failed. Check your API keys.")
+      end
+    end
+
+    context "when API returns an error" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .to_return(
+            status: 500,
+            body: { message: "Internal server error" }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "raises ApiError with status code and message" do
+        expect do
+          api_client.get_prompt(prompt_name)
+        end.to raise_error(Langfuse::ApiError, /API request failed \(500\): Internal server error/)
+      end
+    end
+
+    context "when network error occurs" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .to_timeout
+      end
+
+      it "raises ApiError" do
+        expect do
+          api_client.get_prompt(prompt_name)
+        end.to raise_error(Langfuse::ApiError, /HTTP request failed/)
+      end
+    end
+  end
 end

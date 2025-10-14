@@ -21,6 +21,9 @@ require_relative "langfuse/version"
 module Langfuse
   class Error < StandardError; end
   class ConfigurationError < Error; end
+  class ApiError < Error; end
+  class NotFoundError < ApiError; end
+  class UnauthorizedError < ApiError; end
 end
 
 require_relative "langfuse/config"
