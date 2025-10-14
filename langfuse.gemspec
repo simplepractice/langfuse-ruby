@@ -31,10 +31,10 @@ Gem::Specification.new do |spec|
 
   # Runtime dependencies - added incrementally as needed
   spec.add_dependency "faraday", "~> 2.0"
+  spec.add_dependency "mustache", "~> 1.1"
 
   # Future dependencies:
-  # Phase 1.3: faraday-retry, mustache
-  # Phase 2: concurrent-ruby
+  # Phase 2.2+: concurrent-ruby (for thread-safe caching)
 
   # Development dependencies are specified in Gemfile
 end

@@ -12,7 +12,7 @@
 |-------|--------|------------|
 | 0: Foundation | 🟢 Complete | 100% |
 | 1: HTTP Client | 🟢 Complete | 100% |
-| 2: Prompt Clients | ⬜ Not Started | 0% |
+| 2: Prompt Clients | 🔵 In Progress | 50% |
 | 3: Variable Substitution | ⬜ Not Started | 0% |
 | 4: Caching | ⬜ Not Started | 0% |
 | 5: Global Config | ⬜ Not Started | 0% |
@@ -65,15 +65,24 @@
   - 11 new test examples with WebMock HTTP stubbing
   - Coverage: 98.31%, Tests: 71 passing
 
+- ✅ Phase 2.1 Complete: Text Prompt Client
+  - Created TextPromptClient class with Mustache templating
+  - Implemented compile(variables: {}) method for variable substitution
+  - Support for complex Mustache features (nested objects, conditionals, lists)
+  - HTML escaping by default (security), triple braces for unescaped output
+  - Metadata access (name, version, labels, tags, config)
+  - 26 new test examples
+  - Coverage: 98.57%, Tests: 97 passing
+
 ---
 
 ## Next Steps
 
-1. Phase 2.1: Text Prompt Client
-   - Create TextPromptClient class
-   - Implement compile() method with Mustache templating
-   - Parse and substitute variables in text prompts
-   - Add tests for text prompt functionality
+1. Phase 2.2: Chat Prompt Client
+   - Create ChatPromptClient class for chat/completion prompts
+   - Handle role-based messages (system, user, assistant)
+   - Implement compile() method for chat messages
+   - Add tests for chat prompt functionality
 
 ---
 
