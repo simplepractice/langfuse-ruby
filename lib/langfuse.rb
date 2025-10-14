@@ -24,6 +24,7 @@ module Langfuse
 end
 
 require_relative "langfuse/config"
+require_relative "langfuse/api_client"
 
 module Langfuse
   class << self

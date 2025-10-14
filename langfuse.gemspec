@@ -29,9 +29,12 @@ Gem::Specification.new do |spec|
                         ])
   spec.require_paths = ["lib"]
 
-  # Runtime dependencies - start minimal, add as needed
-  # Phase 1 will add: faraday, faraday-retry, mustache
-  # Phase 2 will add: concurrent-ruby
+  # Runtime dependencies - added incrementally as needed
+  spec.add_dependency "faraday", "~> 2.0"
+
+  # Future dependencies:
+  # Phase 1.3: faraday-retry, mustache
+  # Phase 2: concurrent-ruby
 
   # Development dependencies are specified in Gemfile
 end
