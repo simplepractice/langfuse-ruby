@@ -317,5 +317,109 @@ RSpec.describe Langfuse::ApiClient do
         end.to raise_error(Langfuse::ApiError, /HTTP request failed/)
       end
     end
+
+    # rubocop:disable RSpec/MultipleMemoizedHelpers
+    context "with caching enabled" do
+      let(:cache) { Langfuse::PromptCache.new(ttl: 60) }
+      let(:cached_client) do
+        described_class.new(
+          public_key: public_key,
+          secret_key: secret_key,
+          base_url: base_url,
+          cache: cache
+        )
+      end
+
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .to_return(
+            status: 200,
+            body: prompt_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "stores response in cache" do
+        cached_client.get_prompt(prompt_name)
+        cache_key = Langfuse::PromptCache.build_key(prompt_name)
+        expect(cache.get(cache_key)).to eq(prompt_response)
+      end
+
+      it "returns cached response on second call" do
+        # First call - hits API
+        first_result = cached_client.get_prompt(prompt_name)
+
+        # Second call - should use cache
+        second_result = cached_client.get_prompt(prompt_name)
+
+        expect(second_result).to eq(first_result)
+        # Verify API was only called once
+        expect(
+          a_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+        ).to have_been_made.once
+      end
+
+      it "builds correct cache key with version" do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .with(query: { version: "2" })
+          .to_return(
+            status: 200,
+            body: prompt_response.merge("version" => 2).to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+
+        cached_client.get_prompt(prompt_name, version: 2)
+        cache_key = Langfuse::PromptCache.build_key(prompt_name, version: 2)
+        expect(cache.get(cache_key)).not_to be_nil
+      end
+
+      it "builds correct cache key with label" do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .with(query: { label: "production" })
+          .to_return(
+            status: 200,
+            body: prompt_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+
+        cached_client.get_prompt(prompt_name, label: "production")
+        cache_key = Langfuse::PromptCache.build_key(prompt_name, label: "production")
+        expect(cache.get(cache_key)).not_to be_nil
+      end
+
+      # rubocop:disable RSpec/ExampleLength
+      it "caches different versions separately" do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .with(query: { version: "1" })
+          .to_return(
+            status: 200,
+            body: prompt_response.merge("version" => 1).to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .with(query: { version: "2" })
+          .to_return(
+            status: 200,
+            body: prompt_response.merge("version" => 2).to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+
+        cached_client.get_prompt(prompt_name, version: 1)
+        cached_client.get_prompt(prompt_name, version: 2)
+
+        expect(
+          a_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+            .with(query: { version: "1" })
+        ).to have_been_made.once
+
+        expect(
+          a_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+            .with(query: { version: "2" })
+        ).to have_been_made.once
+      end
+      # rubocop:enable RSpec/ExampleLength
+    end
+    # rubocop:enable RSpec/MultipleMemoizedHelpers
   end
 end

@@ -157,29 +157,61 @@ Extend: `Langfuse::ChatPromptClient`
 ---
 
 ## PHASE 4: Add Caching (Week 2, Days 1-2)
-*Goal: Fast repeated access to prompts*
+*Goal: Fast repeated access to prompts with distributed caching*
 
-### 4.1 Simple In-Memory Cache ⬜
-Build: `Langfuse::PromptCache` (simple version)
-- [ ] Create cache with hash storage
+**Important:** This phase uses Rails.cache (Redis) from the start for production scale (1,200+ processes).
+
+### 4.1 Rails.cache Backend ⬜
+Build: `Langfuse::PromptCache` (Rails.cache version)
+- [ ] Create cache wrapper around Rails.cache
 - [ ] Implement CacheItem class (value, expiry)
-- [ ] Add set(key, value, ttl)
-- [ ] Add get_including_expired(key)
+- [ ] Add set(key, value, ttl) using Rails.cache.write
+- [ ] Add get_including_expired(key) using Rails.cache.read
 - [ ] Add create_key(name:, version:, label:)
-- [ ] Thread safety with Mutex
 - [ ] Write tests
 
 **Files to create:**
 - `lib/langfuse/prompt_cache.rb`
 - `spec/langfuse/prompt_cache_spec.rb`
 
-**Skip for now:**
-- LRU eviction
-- Background refresh
-- Stampede protection
-We'll add these later when needed!
+**Key differences from design doc:**
+- Skip in-memory cache entirely (not suitable for multi-process deployment)
+- Use Rails.cache (Redis) for shared state across processes
+- No LRU eviction needed (Redis handles this)
+- No Mutex needed (Redis is thread-safe)
 
-### 4.2 Integrate Cache with Client ⬜
+### 4.2 Distributed Stampede Protection ⬜
+Extend: `Langfuse::PromptCache`
+- [ ] Implement fetch_with_stampede_protection method
+- [ ] Use Redis lock (Rails.cache.write with unless_exist: true)
+- [ ] Handle lock acquisition failure gracefully
+- [ ] Add timeout for lock (10 seconds)
+- [ ] Write concurrency tests
+
+**Implementation pattern:**
+```ruby
+def fetch_with_stampede_protection(key, ttl:, &block)
+  # Try cache first
+  cached = Rails.cache.read(key)
+  return cached if cached && !expired?(cached)
+
+  # Acquire refresh lock
+  lock_key = "#{key}:refresh_lock"
+  acquired = Rails.cache.write(lock_key, true, unless_exist: true, expires_in: 10)
+
+  if acquired
+    value = block.call
+    Rails.cache.write(key, value, expires_in: ttl)
+    value
+  else
+    # Another process is refreshing - wait briefly and retry
+    sleep(0.1)
+    Rails.cache.read(key) || block.call
+  end
+end
+```
+
+### 4.3 Integrate Cache with Client ⬜
 Extend: `Langfuse::Client`
 - [ ] Add cache instance to Client
 - [ ] Implement cache-first logic in get_prompt
@@ -192,15 +224,16 @@ Extend: `Langfuse::Client`
 - Cache miss
 - Cache hit (fresh)
 - Cache disabled (ttl = 0)
+- Concurrent requests (stampede protection)
 
-**Skip for now:** Stale-while-revalidate - we'll add later
+**Skip for now:** Stale-while-revalidate - keeping it simple
 
-**Milestone:** Basic caching works!
+**Milestone:** Distributed caching with stampede protection!
 
 ---
 
 ## PHASE 5: Global Configuration (Week 2, Day 2)
-*Goal: Rails-friendly initialization*
+*Goal: Rails-friendly initialization with production resilience settings*
 
 ### 5.1 Global Langfuse Module ⬜
 Build: `Langfuse` module methods
@@ -215,19 +248,34 @@ Build: `Langfuse` module methods
 
 **Test with:** Example Rails initializer pattern
 
-### 5.2 Client Initialization Flexibility ⬜
+### 5.2 Config Options for Scale ⬜
+Extend: `Langfuse::Config`
+- [ ] Add require_fallback attribute (default: false)
+- [ ] Add enable_instrumentation attribute (default: true)
+- [ ] Add cache_backend attribute (for future: :memory vs :rails)
+- [ ] Update validate! to check for Rails.cache when using :rails backend
+- [ ] Write tests
+
+**New config options:**
+```ruby
+config.require_fallback = Rails.env.production?  # Enforce fallbacks
+config.enable_instrumentation = ENV.fetch('LANGFUSE_METRICS', 'true') == 'true'
+config.cache_backend = :rails  # Use Rails.cache (Redis)
+```
+
+### 5.3 Client Initialization Flexibility ⬜
 Extend: `Langfuse::Client`
 - [ ] Support Config object in initialize
 - [ ] Support hash options in initialize
 - [ ] Support global config fallback
 - [ ] Write tests for all three patterns
 
-**Milestone:** Can use global config pattern like LaunchDarkly!
+**Milestone:** Can use global config pattern with production-ready settings!
 
 ---
 
 ## PHASE 6: Convenience and Resilience (Week 2, Day 3)
-*Goal: Production-ready error handling*
+*Goal: Production-ready error handling with enforced resilience*
 
 ### 6.1 Fallback Support ⬜
 Extend: `Langfuse::Client#get_prompt`
@@ -238,57 +286,131 @@ Extend: `Langfuse::Client#get_prompt`
 - [ ] Log errors when falling back
 - [ ] Write tests
 
-### 6.2 Compile Prompt Convenience Method ⬜
+### 6.2 Fallback Enforcement ⬜
+Extend: `Langfuse::Client#get_prompt`
+- [ ] Check config.require_fallback setting
+- [ ] Raise ConfigurationError if fallback not provided when required
+- [ ] Add clear error message with usage example
+- [ ] Write tests for enforcement
+
+**Implementation:**
+```ruby
+def get_prompt(name, **options)
+  if @config.require_fallback && !options[:fallback]
+    raise ConfigurationError,
+      "Fallback is required (require_fallback: true). " \
+      "Provide fallback: option to ensure resilience."
+  end
+  # ... rest of implementation
+end
+```
+
+### 6.3 Instrumentation with Config Toggle ⬜
+Extend: `Langfuse::Client`
+- [ ] Add instrument private method
+- [ ] Check config.enable_instrumentation before emitting
+- [ ] Emit events for get_prompt (duration, cache hit, fallback used)
+- [ ] Write tests
+
+**Implementation:**
+```ruby
+def instrument(event, payload)
+  return unless @config.enable_instrumentation
+  return unless defined?(ActiveSupport::Notifications)
+  ActiveSupport::Notifications.instrument("langfuse.#{event}", payload)
+end
+```
+
+### 6.4 Compile Prompt Convenience Method ⬜
 Extend: `Langfuse::Client`
 - [ ] Implement compile_prompt(name, variables:, placeholders:, **options)
 - [ ] One-step get + compile
 - [ ] Support fallback option
 - [ ] Write tests
 
-### 6.3 Retry Logic ⬜
+### 6.5 Retry Logic ⬜
 Extend: `Langfuse::ApiClient`
 - [ ] Add faraday-retry dependency
-- [ ] Configure retry middleware
+- [ ] Configure retry middleware (basic: max 2, interval 0.5)
 - [ ] Test retry behavior (with WebMock failure simulation)
 
 **Dependencies added:** `faraday-retry ~> 2.0`
 
-**Milestone:** Basic Phase 1 MVP complete! 🎉
+**Note:** Advanced retry tuning comes in Phase 7
+
+**Milestone:** Basic Phase 1 MVP complete with enforced resilience! 🎉
 
 ---
 
-## PHASE 7: Advanced Caching (Week 3, Day 1)
-*Goal: Production-grade caching*
+## PHASE 7: Circuit Breaker and Retry Tuning (Week 3, Day 1)
+*Goal: Prevent cascading failures and optimize retry behavior*
 
-### 7.1 LRU Eviction ⬜
-Extend: `Langfuse::PromptCache`
-- [ ] Add max_size configuration
-- [ ] Track access order
-- [ ] Implement LRU eviction
+### 7.1 Circuit Breaker Integration ⬜
+Add: Circuit breaker to `Langfuse::ApiClient`
+- [ ] Add stoplight gem dependency
+- [ ] Initialize Stoplight circuit breaker in ApiClient
+- [ ] Configure thresholds (5 failures, 30s timeout)
+- [ ] Configure Redis data store for shared state
+- [ ] Wrap API calls with circuit breaker
+- [ ] Handle RedLight errors gracefully (return nil)
 - [ ] Write tests
 
-### 7.2 Stale-While-Revalidate ⬜
-Extend: `Langfuse::PromptCache` and `Client`
-- [ ] Detect expired cache
-- [ ] Return stale value immediately
-- [ ] Trigger background refresh
-- [ ] Add concurrent-ruby dependency for thread pool
-- [ ] Write tests
+**Dependencies added:** `stoplight ~> 4.0`
 
-**Dependencies added:** `concurrent-ruby ~> 1.2`
+**Implementation:**
+```ruby
+@circuit_breaker = Stoplight("langfuse-api")
+  .with_threshold(5)
+  .with_timeout(30)
+  .with_cool_off_time(10)
+  .with_data_store(Stoplight::DataStore::Redis.new(Redis.current))
 
-### 7.3 Stampede Protection ⬜
-Extend: `Langfuse::PromptCache`
-- [ ] Track refreshing keys
-- [ ] Prevent duplicate refreshes
-- [ ] Write concurrency tests
+def get_prompt(name, **options)
+  @circuit_breaker.run do
+    connection.get("/api/public/v2/prompts/#{name}")
+  end
+rescue Stoplight::Error::RedLight => e
+  logger.warn("Langfuse circuit breaker open: #{e.message}")
+  nil  # Caller handles with fallback
+end
+```
 
-**Milestone:** Production-grade caching!
+### 7.2 Advanced Retry Configuration ⬜
+Extend: `Langfuse::ApiClient` retry middleware
+- [ ] Reduce max retries from 2 to 1 (total attempts: 2 instead of 3)
+- [ ] Increase jitter (interval_randomness: 0.75)
+- [ ] Only retry safe methods (GET only)
+- [ ] Only retry specific statuses (429, 503, 504)
+- [ ] Test improved retry behavior
+
+**Updated retry config:**
+```ruby
+conn.request :retry,
+  max: 1,                        # Reduced from 2
+  interval: 0.5,
+  interval_randomness: 0.75,     # Increased from 0.5
+  backoff_factor: 2,
+  methods: [:get],               # Only GET
+  retry_statuses: [429, 503, 504],  # Removed 500, 502
+  exceptions: [
+    Faraday::TimeoutError,
+    Faraday::ConnectionFailed
+  ]
+```
+
+### 7.3 Circuit Breaker Metrics ⬜
+Extend: Instrumentation
+- [ ] Add circuit breaker state to instrumentation payload
+- [ ] Emit circuit open/close events
+- [ ] Document monitoring setup for circuit breaker
+- [ ] Write example Datadog/StatsD integration
+
+**Milestone:** Production-grade reliability with circuit breaker!
 
 ---
 
-## PHASE 8: CRUD Operations (Week 3, Days 2-3)
-*Goal: Create and update prompts*
+## PHASE 8: CRUD Operations and Cache Warming (Week 3, Days 2-3)
+*Goal: Create and update prompts, plus deployment tooling*
 
 ### 8.1 Create Prompt ⬜
 Extend: `Langfuse::ApiClient` and `Client`
@@ -302,15 +424,64 @@ Extend: `Langfuse::ApiClient` and `Client`
 Extend: `Langfuse::ApiClient` and `Client`
 - [ ] Implement ApiClient#update_prompt_version
 - [ ] Implement Client#update_prompt
-- [ ] Cache invalidation on successful update
+- [ ] Cache invalidation on successful update (Redis)
 - [ ] Write tests
 
 ### 8.3 Invalidate Cache ⬜
 Extend: `Langfuse::Client`
 - [ ] Implement invalidate_cache(name)
+- [ ] Clear all cache keys matching prompt name pattern
 - [ ] Write tests
 
-### 8.4 Chat Placeholders (Full) ⬜
+### 8.4 Cache Warming Rake Task ⬜
+Add: Deployment tooling for cache warming
+- [ ] Create lib/tasks/langfuse.rake
+- [ ] Implement warm_cache task with prompt list argument
+- [ ] Support ENV variable for prompt list
+- [ ] Add success/failure reporting
+- [ ] Document usage in README
+
+**Files to create:**
+- `lib/tasks/langfuse.rake`
+
+**Implementation:**
+```ruby
+namespace :langfuse do
+  desc "Warm prompt cache with specified prompts"
+  task :warm_cache, [:prompts] => :environment do |t, args|
+    prompts = if args[:prompts]
+                args[:prompts].split(',')
+              else
+                ENV.fetch('LANGFUSE_PROMPTS_TO_WARM', '').split(',')
+              end
+
+    client = Langfuse.client
+    results = { success: [], failed: [] }
+
+    prompts.each do |name|
+      begin
+        client.get_prompt(name.strip, cache_ttl: 300)
+        results[:success] << name
+      rescue => e
+        results[:failed] << name
+      end
+    end
+
+    puts "Success: #{results[:success].size}/#{prompts.size}"
+  end
+end
+```
+
+**Usage:**
+```bash
+# In deploy script
+bundle exec rake langfuse:warm_cache['greeting,conversation,rag-pipeline']
+
+# Or via environment variable
+LANGFUSE_PROMPTS_TO_WARM=greeting,conversation rake langfuse:warm_cache
+```
+
+### 8.5 Chat Placeholders (Full) ⬜
 Extend: `Langfuse::ChatPromptClient`
 - [ ] Implement full placeholder resolution in compile
 - [ ] Handle empty arrays
@@ -318,7 +489,7 @@ Extend: `Langfuse::ChatPromptClient`
 - [ ] Support required_placeholders parameter
 - [ ] Write comprehensive tests
 
-**Milestone:** Full CRUD operations!
+**Milestone:** Full CRUD operations with deployment tooling!
 
 ---
 
@@ -346,10 +517,11 @@ Extend: `ChatPromptClient#to_langchain`
 *Goal: Production ready*
 
 ### 10.1 Observability ⬜
-- [ ] Add ActiveSupport::Notifications instrumentation
-- [ ] Document metric emission
-- [ ] Example StatsD/Datadog integration
-- [ ] Write example monitoring code
+- [ ] Document ActiveSupport::Notifications integration (already implemented in Phase 6)
+- [ ] Document enable_instrumentation config toggle
+- [ ] Write comprehensive StatsD/Datadog integration examples
+- [ ] Document circuit breaker monitoring
+- [ ] Write example monitoring dashboards
 
 ### 10.2 Documentation ⬜
 - [ ] Complete API documentation with YARD
@@ -407,7 +579,18 @@ Extend: `ChatPromptClient#to_langchain`
 
 ### Deviations from Design Doc
 *(Document any intentional changes from the design doc here)*
-- None yet
+
+1. **Phase 4 - Redis Cache from Start**: Skipped in-memory cache implementation entirely. Design doc had incremental approach (simple in-memory → advanced in-memory → Rails.cache option), but production scale requirements (1,200 Passenger processes × 7 threads) demand shared cache from Day 1.
+
+2. **Phase 4 - Distributed Stampede Protection**: Moved from Phase 7 to Phase 4. At scale, cache misses across 1,200 processes = 1,200 simultaneous API calls without this. Critical for production deployment.
+
+3. **Phase 5 - Additional Config Options**: Added `require_fallback` and `enable_instrumentation` config options not in original design. These support production resilience and observability requirements.
+
+4. **Phase 7 - Circuit Breaker Instead of Cache Improvements**: Replaced LRU eviction and stale-while-revalidate with circuit breaker pattern. With Redis cache, LRU/stale-while-revalidate less critical. Circuit breaker prevents cascading failures during Langfuse API outages.
+
+5. **Phase 7 - Retry Tuning**: Reduced max retries from 2 to 1 (3 total attempts → 2). At scale, retry amplification during outages causes problems (1,200 processes × 50 prompts × 3 attempts = massive API load).
+
+6. **Phase 8 - Cache Warming Rake Task**: Added deployment tooling not in original design. Helps prevent cold-start API spikes when all 1,200 processes restart simultaneously.
 
 ### Technical Debt
 *(Track shortcuts taken that need revisiting)*
@@ -415,4 +598,31 @@ Extend: `ChatPromptClient#to_langchain`
 
 ### Decisions Made
 *(Document key technical decisions)*
-- None yet
+
+**2025-10-13 - Scale-Driven Architecture Changes**
+- **Context**: Deploying to large Rails monolith (100 web services, 12 Passenger instances each, 7 threads per instance = 8,400 concurrent threads)
+- **Key Problems Identified**:
+  1. In-memory cache = 1,200 isolated caches with inconsistent invalidation
+  2. Cache expiry without stampede protection = thundering herd (1,200 simultaneous API calls)
+  3. Cold start (deploy/restart) = massive API spike
+  4. Retry amplification during outages
+  5. No circuit breaker = cascading failures
+
+- **Solutions Implemented**:
+  1. **Rails.cache (Redis) from Phase 4**: Shared cache across all processes
+  2. **Distributed Stampede Protection**: Redis-based locks prevent duplicate refreshes
+  3. **Circuit Breaker (Phase 7)**: Stoplight gem with Redis backend, shared state
+  4. **Retry Tuning (Phase 7)**: Reduced retries, increased jitter, only retry safe methods
+  5. **Fallback Enforcement (Phase 6)**: Config option to require fallbacks in production
+  6. **Cache Warming Rake Task (Phase 8)**: Pre-populate cache before serving traffic
+  7. **Instrumentation Config Toggle (Phase 5/6)**: Optional metrics emission
+
+- **Trade-offs**:
+  - ✅ Production-ready at scale from Day 1
+  - ✅ No process isolation issues
+  - ❌ Requires Redis (acceptable - already required for Rails.cache)
+  - ❌ Slightly more complex initial implementation
+  - ❌ Can't use gem without Redis (acceptable for target use case)
+
+- **Alternative Considered**: Keep in-memory cache as default, add Rails.cache as opt-in
+- **Why Rejected**: At target scale (1,200+ processes), in-memory cache is fundamentally broken. Better to build correctly from start than support two cache backends.

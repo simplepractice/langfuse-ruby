@@ -1,8 +1,8 @@
 # Langfuse Ruby - Development Progress Tracker
 
 **Started:** 2025-10-13
-**Current Phase:** 1 - HTTP Client
-**Last Updated:** 2025-10-13
+**Current Phase:** 4 - Caching
+**Last Updated:** 2025-10-15
 
 ---
 
@@ -13,8 +13,8 @@
 | 0: Foundation | 🟢 Complete | 100% |
 | 1: HTTP Client | 🟢 Complete | 100% |
 | 2: Prompt Clients | 🟢 Complete | 100% |
-| 3: Variable Substitution | ⬜ Not Started | 0% |
-| 4: Caching | ⬜ Not Started | 0% |
+| 3: Variable Substitution | 🟢 Complete | 100% |
+| 4: Caching | 🟢 Complete | 100% |
 | 5: Global Config | ⬜ Not Started | 0% |
 | 6: Convenience | ⬜ Not Started | 0% |
 | 7: Advanced Caching | ⬜ Not Started | 0% |
@@ -85,18 +85,30 @@
   - 31 new test examples
   - Coverage: 98.82%, Tests: 128 passing
 
+### 2025-10-15
+- ✅ Phase 4.1 Complete: Simple Caching
+  - Created PromptCache class with thread-safe in-memory caching
+  - TTL-based expiration with configurable max_size
+  - LRU eviction when cache reaches max_size
+  - Monitor-based synchronization for thread safety
+  - Integrated caching into ApiClient with optional cache parameter
+  - Cache key generation with support for version and label parameters
+  - Methods: get, set, clear, cleanup_expired, size, empty?
+  - 26 new test examples for PromptCache
+  - 5 new test examples for ApiClient caching integration
+  - Coverage: 99.11%, Tests: 161 passing
+  - Note: Phase 3 (Variable Substitution) was already complete via Mustache integration in Phase 2
+
 ---
 
 ## Next Steps
 
-1. Phase 3: Variable Substitution (Already Complete - using Mustache)
-   - Text and Chat clients already support full Mustache templating
-   - Skip to Phase 4: Caching
-
-2. Phase 4.1: Simple Caching
-   - Implement in-memory cache with TTL
-   - Add cache to ApiClient for prompt responses
-   - Implement cache invalidation
+1. Phase 5: Global Config & Singleton Client
+   - Create global Langfuse module methods
+   - Implement Langfuse.configure block pattern
+   - Create Langfuse.client singleton
+   - Update global config to support cache settings
+   - Ensure global client uses cache automatically
 
 ---
 

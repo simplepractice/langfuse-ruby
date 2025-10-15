@@ -20,7 +20,7 @@ module Langfuse
   #   )
   #
   class ApiClient
-    attr_reader :public_key, :secret_key, :base_url, :timeout, :logger
+    attr_reader :public_key, :secret_key, :base_url, :timeout, :logger, :cache
 
     # Initialize a new API client
     #
@@ -29,12 +29,16 @@ module Langfuse
     # @param base_url [String] Base URL for Langfuse API
     # @param timeout [Integer] HTTP request timeout in seconds
     # @param logger [Logger] Logger instance for debugging
-    def initialize(public_key:, secret_key:, base_url:, timeout: 5, logger: nil)
+    # @param cache [PromptCache, nil] Optional cache for prompt responses
+    # rubocop:disable Metrics/ParameterLists
+    def initialize(public_key:, secret_key:, base_url:, timeout: 5, logger: nil, cache: nil)
+      # rubocop:enable Metrics/ParameterLists
       @public_key = public_key
       @secret_key = secret_key
       @base_url = base_url
       @timeout = timeout
       @logger = logger || Logger.new($stdout, level: Logger::WARN)
+      @cache = cache
     end
 
     # Get a Faraday connection
@@ -53,6 +57,9 @@ module Langfuse
 
     # Fetch a prompt from the Langfuse API
     #
+    # Checks cache first if caching is enabled. On cache miss, fetches from API
+    # and stores in cache.
+    #
     # @param name [String] The name of the prompt
     # @param version [Integer, nil] Optional specific version number
     # @param label [String, nil] Optional label (e.g., "production", "latest")
@@ -61,14 +68,29 @@ module Langfuse
     # @raise [NotFoundError] if the prompt is not found
     # @raise [UnauthorizedError] if authentication fails
     # @raise [ApiError] for other API errors
+    # rubocop:disable Metrics/AbcSize
     def get_prompt(name, version: nil, label: nil)
+      # rubocop:enable Metrics/AbcSize
       raise ArgumentError, "Cannot specify both version and label" if version && label
 
+      # Check cache first if enabled
+      if cache
+        cache_key = PromptCache.build_key(name, version: version, label: label)
+        cached_data = cache.get(cache_key)
+        return cached_data if cached_data
+      end
+
+      # Fetch from API
       params = build_prompt_params(version: version, label: label)
       path = "/api/public/v2/prompts/#{name}"
 
       response = connection.get(path, params)
-      handle_response(response)
+      prompt_data = handle_response(response)
+
+      # Store in cache if enabled
+      cache&.set(cache_key, prompt_data)
+
+      prompt_data
     rescue Faraday::Error => e
       logger.error("Faraday error: #{e.message}")
       raise ApiError, "HTTP request failed: #{e.message}"
