@@ -47,102 +47,32 @@
 - ✅ Config validation on initialization
 - ✅ 187 tests passing, 99.6% coverage
 
+### Phase 6: Convenience Features (COMPLETE)
+- ✅ compile_prompt convenience method
+- ✅ Fallback support for graceful degradation
+- ✅ Basic retry logic with faraday-retry
+- ✅ 221 tests passing, 99.63% coverage
+- ⏭️ Instrumentation hooks (deferred to post-launch)
+
 ### Documentation (COMPLETE)
 - ✅ Comprehensive README with examples
 - ✅ API reference documentation
 - ✅ Usage examples for text and chat prompts
 - ✅ Configuration and caching guides
 
-**Current Status:** Production-ready prompt management with in-memory caching!
-
----
-
-## Next: Phase 6 - Convenience Features
-
-*Goal: Make the SDK more ergonomic and production-friendly*
-
-### 6.1 Compile Convenience Method
-**Add to:** `Langfuse::Client`
-
-```ruby
-# One-liner: fetch + compile
-text = client.compile_prompt("greeting", variables: { name: "Alice" })
-
-# With fallback
-text = client.compile_prompt(
-  "greeting",
-  variables: { name: "Alice" },
-  fallback: "Hello {{name}}!",
-  type: :text
-)
-```
-
-**Tasks:**
-- [ ] Implement `compile_prompt(name, variables: {}, **options)`
-- [ ] Support fallback option
-- [ ] Return compiled string for text prompts
-- [ ] Return compiled messages array for chat prompts
-- [ ] Write tests (happy path, fallback, errors)
-
-### 6.2 Fallback Support
-**Add to:** `Langfuse::Client#get_prompt`
-
-```ruby
-# Graceful degradation on API errors
-prompt = client.get_prompt(
-  "greeting",
-  fallback: "Hello {{name}}!",
-  type: :text  # Required with fallback
-)
-```
-
-**Tasks:**
-- [ ] Add `fallback:` and `type:` parameters to get_prompt
-- [ ] Validate fallback type matches (text vs chat)
-- [ ] Return fallback prompt client on API errors
-- [ ] Log warnings when falling back
-- [ ] Write tests (404, 401, 500, network errors)
-
-### 6.3 Basic Retry Logic
-**Add to:** `Langfuse::ApiClient`
-
-Add automatic retries for transient errors:
-- Max 2 retries (3 total attempts)
-- Exponential backoff with jitter
-- Only retry GET requests
-- Only retry safe status codes (429, 503, 504)
-
-**Tasks:**
-- [ ] Add `faraday-retry` dependency
-- [ ] Configure retry middleware in ApiClient
-- [ ] Write tests with WebMock (simulate failures)
-- [ ] Update README with retry behavior
-
-**Dependencies:** `faraday-retry ~> 2.0`
-
-### 6.4 Instrumentation Hooks (Optional)
-**Add to:** `Langfuse::Client`
-
-Emit events for observability (optional, ActiveSupport::Notifications):
-
-```ruby
-ActiveSupport::Notifications.subscribe("langfuse.get_prompt") do |event|
-  # event.payload includes: name, duration, cache_hit, fallback_used
-end
-```
-
-**Tasks:**
-- [ ] Add private `instrument(event, payload)` method
-- [ ] Check if ActiveSupport::Notifications is defined
-- [ ] Emit events for get_prompt (duration, cache_hit, fallback_used)
-- [ ] Document in README
-- [ ] Write tests (with and without ActiveSupport)
-
-**Milestone:** Ergonomic API with graceful degradation! 🎯
+**Current Status:** Production-ready prompt management with fallback support and automatic retries!
 
 ---
 
 ## Future Phases (Post-Launch)
+
+### Phase 6.4: Instrumentation Hooks (Optional)
+*Deferred to post-launch*
+
+Add ActiveSupport::Notifications integration for observability:
+- Event emission for get_prompt operations
+- Payload includes: name, duration, cache_hit, fallback_used
+- Optional feature, only active if ActiveSupport is defined
 
 ### Phase 7: Advanced Caching (Optional)
 *For users who need Redis/distributed caching*
@@ -223,6 +153,7 @@ end
 
 **Runtime:**
 - `faraday ~> 2.0` - HTTP client
+- `faraday-retry ~> 2.0` - Automatic retries with exponential backoff
 - `mustache ~> 1.1` - Variable substitution
 
 **Development:**
@@ -231,14 +162,11 @@ end
 - `simplecov` - Coverage
 - `webmock` - HTTP stubbing
 
-**To Add in Phase 6:**
-- `faraday-retry ~> 2.0` - Automatic retries
-
 ---
 
 ## Test Coverage Target
 
-- **Current:** 99.6% (247/248 lines)
+- **Current:** 99.63% (267/268 lines) - 221 tests
 - **Target:** > 95% for 1.0 release
 - **Status:** ✅ Exceeding target!
 

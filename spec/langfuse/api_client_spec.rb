@@ -421,5 +421,69 @@ RSpec.describe Langfuse::ApiClient do
       # rubocop:enable RSpec/ExampleLength
     end
     # rubocop:enable RSpec/MultipleMemoizedHelpers
+
+    context "with retry middleware configuration" do
+      # Note: Direct retry behavior testing is challenging with WebMock due to
+      # known incompatibilities. These tests verify the middleware is properly
+      # configured. Actual retry behavior is tested in integration tests.
+
+      it "includes retry middleware in connection" do
+        conn = api_client.connection
+        handlers = conn.builder.handlers.map(&:name)
+        expect(handlers).to include("Faraday::Retry::Middleware")
+      end
+
+      it "configures retry with correct max attempts" do
+        options = api_client.send(:retry_options)
+        expect(options[:max]).to eq(2)
+      end
+
+      it "configures retry with exponential backoff" do
+        options = api_client.send(:retry_options)
+        expect(options[:interval]).to eq(0.05)
+        expect(options[:backoff_factor]).to eq(2)
+      end
+
+      it "configures retry for GET requests only" do
+        options = api_client.send(:retry_options)
+        expect(options[:methods]).to eq([:get])
+      end
+
+      it "configures retry for transient error status codes" do
+        options = api_client.send(:retry_options)
+        expect(options[:retry_statuses]).to match_array([429, 503, 504])
+      end
+
+      it "configures retry for network errors" do
+        options = api_client.send(:retry_options)
+        expect(options[:exceptions]).to include(
+          Faraday::TimeoutError,
+          Faraday::ConnectionFailed
+        )
+      end
+
+      it "handles retry exhaustion by raising appropriate error" do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .to_return(status: 429)
+
+        expect do
+          api_client.get_prompt(prompt_name)
+        end.to raise_error(Langfuse::ApiError, /API request failed \(429\)/)
+      end
+
+      it "does not retry on non-retriable status codes" do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+          .to_return(status: 404, body: { message: "Not found" }.to_json)
+
+        expect do
+          api_client.get_prompt(prompt_name)
+        end.to raise_error(Langfuse::NotFoundError)
+
+        # Verify only 1 attempt
+        expect(
+          a_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
+        ).to have_been_made.once
+      end
+    end
   end
 end

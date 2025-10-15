@@ -31,6 +31,7 @@ Gem::Specification.new do |spec|
 
   # Runtime dependencies - added incrementally as needed
   spec.add_dependency "faraday", "~> 2.0"
+  spec.add_dependency "faraday-retry", "~> 2.0"
   spec.add_dependency "mustache", "~> 1.1"
 
   # Future dependencies:

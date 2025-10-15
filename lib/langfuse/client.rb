@@ -49,14 +49,71 @@ module Langfuse
     # @param name [String] The name of the prompt
     # @param version [Integer, nil] Optional specific version number
     # @param label [String, nil] Optional label (e.g., "production", "latest")
+    # @param fallback [String, Array, nil] Optional fallback prompt to use on error
+    # @param type [Symbol, nil] Required when fallback is provided (:text or :chat)
     # @return [TextPromptClient, ChatPromptClient] The prompt client
     # @raise [ArgumentError] if both version and label are provided
-    # @raise [NotFoundError] if the prompt is not found
-    # @raise [UnauthorizedError] if authentication fails
-    # @raise [ApiError] for other API errors
-    def get_prompt(name, version: nil, label: nil)
+    # @raise [ArgumentError] if fallback is provided without type
+    # @raise [NotFoundError] if the prompt is not found and no fallback provided
+    # @raise [UnauthorizedError] if authentication fails and no fallback provided
+    # @raise [ApiError] for other API errors and no fallback provided
+    #
+    # @example With fallback for graceful degradation
+    #   prompt = client.get_prompt("greeting", fallback: "Hello {{name}}!", type: :text)
+    def get_prompt(name, version: nil, label: nil, fallback: nil, type: nil)
+      # Validate fallback usage
+      if fallback && !type
+        raise ArgumentError, "type parameter is required when fallback is provided (use :text or :chat)"
+      end
+
+      # Try to fetch from API
       prompt_data = api_client.get_prompt(name, version: version, label: label)
       build_prompt_client(prompt_data)
+    rescue ApiError, NotFoundError, UnauthorizedError => e
+      # If no fallback, re-raise the error
+      raise e unless fallback
+
+      # Log warning and return fallback
+      config.logger.warn("Langfuse API error for prompt '#{name}': #{e.message}. Using fallback.")
+      build_fallback_prompt_client(name, fallback, type)
+    end
+
+    # Convenience method: fetch and compile a prompt in one call
+    #
+    # This is a shorthand for calling get_prompt followed by compile.
+    # Returns the compiled prompt ready to use with your LLM.
+    #
+    # @param name [String] The name of the prompt
+    # @param variables [Hash] Variables to substitute in the prompt
+    # @param version [Integer, nil] Optional specific version number
+    # @param label [String, nil] Optional label (e.g., "production", "latest")
+    # @param fallback [String, Array, nil] Optional fallback prompt to use on error
+    # @param type [Symbol, nil] Required when fallback is provided (:text or :chat)
+    # @return [String, Array<Hash>] Compiled prompt (String for text, Array for chat)
+    # @raise [ArgumentError] if both version and label are provided
+    # @raise [ArgumentError] if fallback is provided without type
+    # @raise [NotFoundError] if the prompt is not found and no fallback provided
+    # @raise [UnauthorizedError] if authentication fails and no fallback provided
+    # @raise [ApiError] for other API errors and no fallback provided
+    #
+    # @example Compile a text prompt
+    #   text = client.compile_prompt("greeting", variables: { name: "Alice" })
+    #   # => "Hello Alice!"
+    #
+    # @example Compile a chat prompt
+    #   messages = client.compile_prompt("support-bot", variables: { company: "Acme" })
+    #   # => [{ role: :system, content: "You are a support agent for Acme" }]
+    #
+    # @example With fallback
+    #   text = client.compile_prompt(
+    #     "greeting",
+    #     variables: { name: "Alice" },
+    #     fallback: "Hello {{name}}!",
+    #     type: :text
+    #   )
+    def compile_prompt(name, variables: {}, version: nil, label: nil, fallback: nil, type: nil)
+      prompt = get_prompt(name, version: version, label: label, fallback: fallback, type: type)
+      prompt.compile(variables: variables)
     end
 
     private
@@ -93,6 +150,35 @@ module Langfuse
         ChatPromptClient.new(prompt_data)
       else
         raise ApiError, "Unknown prompt type: #{type}"
+      end
+    end
+
+    # Build a fallback prompt client from fallback data
+    #
+    # @param name [String] The prompt name
+    # @param fallback [String, Array] The fallback prompt content
+    # @param type [Symbol] The prompt type (:text or :chat)
+    # @return [TextPromptClient, ChatPromptClient]
+    # @raise [ArgumentError] if type is invalid
+    def build_fallback_prompt_client(name, fallback, type)
+      # Create minimal prompt data structure
+      prompt_data = {
+        "name" => name,
+        "version" => 0,
+        "type" => type.to_s,
+        "prompt" => fallback,
+        "labels" => [],
+        "tags" => ["fallback"],
+        "config" => {}
+      }
+
+      case type
+      when :text
+        TextPromptClient.new(prompt_data)
+      when :chat
+        ChatPromptClient.new(prompt_data)
+      else
+        raise ArgumentError, "Invalid type: #{type}. Must be :text or :chat"
       end
     end
   end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "faraday"
+require "faraday/retry"
 require "base64"
 require "json"
 
@@ -91,6 +92,10 @@ module Langfuse
       cache&.set(cache_key, prompt_data)
 
       prompt_data
+    rescue Faraday::RetriableResponse => e
+      # Retry middleware exhausted all retries - handle the final response
+      logger.error("Faraday error: Retries exhausted - #{e.response.status}")
+      handle_response(e.response)
     rescue Faraday::Error => e
       logger.error("Faraday error: #{e.message}")
       raise ApiError, "HTTP request failed: #{e.message}"
@@ -108,10 +113,32 @@ module Langfuse
         headers: default_headers
       ) do |conn|
         conn.request :json
+        conn.request :retry, retry_options
         conn.response :json, content_type: /\bjson$/
         conn.adapter Faraday.default_adapter
         conn.options.timeout = timeout || @timeout
       end
+    end
+
+    # Configuration for retry middleware
+    #
+    # Retries transient errors with exponential backoff:
+    # - Max 2 retries (3 total attempts)
+    # - Exponential backoff (0.05s * 2^retry_count)
+    # - Only retries GET requests (safe to retry)
+    # - Retries on: 429 (rate limit), 503 (service unavailable), 504 (gateway timeout)
+    # - Does NOT retry on: 4xx errors (except 429), 5xx errors (except 503, 504)
+    #
+    # @return [Hash] Retry options for Faraday::Retry middleware
+    def retry_options
+      {
+        max: 2,
+        interval: 0.05,
+        backoff_factor: 2,
+        methods: [:get],
+        retry_statuses: [429, 503, 504],
+        exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
+      }
     end
 
     # Default headers for all requests
