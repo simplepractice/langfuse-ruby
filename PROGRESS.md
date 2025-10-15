@@ -12,7 +12,7 @@
 |-------|--------|------------|
 | 0: Foundation | 🟢 Complete | 100% |
 | 1: HTTP Client | 🟢 Complete | 100% |
-| 2: Prompt Clients | 🔵 In Progress | 50% |
+| 2: Prompt Clients | 🟢 Complete | 100% |
 | 3: Variable Substitution | ⬜ Not Started | 0% |
 | 4: Caching | ⬜ Not Started | 0% |
 | 5: Global Config | ⬜ Not Started | 0% |
@@ -74,15 +74,29 @@
   - 26 new test examples
   - Coverage: 98.57%, Tests: 97 passing
 
+- ✅ Phase 2.2 Complete: Chat Prompt Client
+  - Created ChatPromptClient class for chat/completion prompts
+  - Implemented compile(variables: {}) method for chat messages
+  - Role-based message support (system, user, assistant)
+  - Variable substitution in each message independently
+  - Role normalization to lowercase symbols
+  - Support for Mustache features (nested objects, conditionals, lists)
+  - HTML escaping by default, triple braces for unescaped output
+  - 31 new test examples
+  - Coverage: 98.82%, Tests: 128 passing
+
 ---
 
 ## Next Steps
 
-1. Phase 2.2: Chat Prompt Client
-   - Create ChatPromptClient class for chat/completion prompts
-   - Handle role-based messages (system, user, assistant)
-   - Implement compile() method for chat messages
-   - Add tests for chat prompt functionality
+1. Phase 3: Variable Substitution (Already Complete - using Mustache)
+   - Text and Chat clients already support full Mustache templating
+   - Skip to Phase 4: Caching
+
+2. Phase 4.1: Simple Caching
+   - Implement in-memory cache with TTL
+   - Add cache to ApiClient for prompt responses
+   - Implement cache invalidation
 
 ---
 
