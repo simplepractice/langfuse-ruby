@@ -115,17 +115,32 @@
 
 ## Next Steps
 
-1. Phase 6: Convenience Features
-   - Add compile_and_format helpers for common use cases
-   - Add error handling with fallback prompts
-   - Add debugging/logging helpers
-   - Consider adding prompt validation helpers
+**See [IMPLEMENTATION_PLAN_V2.md](IMPLEMENTATION_PLAN_V2.md) for the updated roadmap.**
+
+### Phase 6: Convenience Features (Next)
+- Compile convenience method (one-liner fetch + compile)
+- Fallback support for graceful degradation
+- Basic retry logic with faraday-retry
+- Optional instrumentation hooks (ActiveSupport::Notifications)
+
+### Future Phases (Post-Launch)
+- Phase 7: Advanced Caching (Redis/Rails.cache as optional backend)
+- Phase 8: CRUD Operations (create/update prompts)
+- Phase 9: LangChain Integration
+- Phase 10: Polish & 1.0 Release
+- Phase 11: CI/CD & Automation
 
 ---
 
 ## Decisions Log
 
-*(Key technical decisions will be tracked here)*
+**2025-10-15 - Roadmap Simplification**
+- **Decision**: Created IMPLEMENTATION_PLAN_V2.md with simplified roadmap
+- **Context**: Original IMPLEMENTATION_PLAN.md evolved toward Rails/Redis-specific architecture, but we built a simpler, more portable solution
+- **What We Built**: In-memory PromptCache with Monitor synchronization (thread-safe, no external deps)
+- **Future Plans**: Redis/distributed caching moved to Phase 7 as optional feature for high-scale deployments
+- **Benefit**: Gem works great for most use cases without requiring Redis. Can scale up later if needed.
+- **Note**: Old plan preserved as IMPLEMENTATION_PLAN.md for reference
 
 ---
 
