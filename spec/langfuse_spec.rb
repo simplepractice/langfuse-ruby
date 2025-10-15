@@ -35,6 +35,38 @@ RSpec.describe Langfuse do
     end
   end
 
+  describe ".client" do
+    before do
+      described_class.configure do |config|
+        config.public_key = "pk_test_123"
+        config.secret_key = "sk_test_456"
+        config.base_url = "https://cloud.langfuse.com"
+      end
+    end
+
+    it "returns a Client instance" do
+      expect(described_class.client).to be_a(Langfuse::Client)
+    end
+
+    it "memoizes the client" do
+      client1 = described_class.client
+      client2 = described_class.client
+      expect(client1).to eq(client2)
+    end
+
+    it "uses the global configuration" do
+      client = described_class.client
+      expect(client.config).to eq(described_class.configuration)
+    end
+
+    it "creates client with configured settings" do
+      client = described_class.client
+      expect(client.api_client.public_key).to eq("pk_test_123")
+      expect(client.api_client.secret_key).to eq("sk_test_456")
+      expect(client.api_client.base_url).to eq("https://cloud.langfuse.com")
+    end
+  end
+
   describe ".reset!" do
     it "resets configuration and client" do
       described_class.configure { |c| c.public_key = "test" }
@@ -43,16 +75,13 @@ RSpec.describe Langfuse do
       expect(described_class.instance_variable_get(:@configuration)).to be_nil
       expect(described_class.instance_variable_get(:@client)).to be_nil
     end
-  end
 
-  # Client will be tested when implemented
-  # describe ".client" do
-  #   it "returns a Client instance" do
-  #     described_class.configure do |config|
-  #       config.public_key = "pk_test"
-  #       config.secret_key = "sk_test"
-  #     end
-  #     expect(described_class.client).to be_a(Langfuse::Client)
-  #   end
-  # end
+    it "allows creating new configuration after reset" do
+      described_class.configure { |c| c.public_key = "old_key" }
+      described_class.reset!
+
+      described_class.configure { |c| c.public_key = "new_key" }
+      expect(described_class.configuration.public_key).to eq("new_key")
+    end
+  end
 end

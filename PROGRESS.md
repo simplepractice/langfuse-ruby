@@ -1,7 +1,7 @@
 # Langfuse Ruby - Development Progress Tracker
 
 **Started:** 2025-10-13
-**Current Phase:** 4 - Caching
+**Current Phase:** 6 - Convenience Features
 **Last Updated:** 2025-10-15
 
 ---
@@ -15,7 +15,7 @@
 | 2: Prompt Clients | 🟢 Complete | 100% |
 | 3: Variable Substitution | 🟢 Complete | 100% |
 | 4: Caching | 🟢 Complete | 100% |
-| 5: Global Config | ⬜ Not Started | 0% |
+| 5: Global Config | 🟢 Complete | 100% |
 | 6: Convenience | ⬜ Not Started | 0% |
 | 7: Advanced Caching | ⬜ Not Started | 0% |
 | 8: CRUD Operations | ⬜ Not Started | 0% |
@@ -99,16 +99,27 @@
   - Coverage: 99.11%, Tests: 161 passing
   - Note: Phase 3 (Variable Substitution) was already complete via Mustache integration in Phase 2
 
+- ✅ Phase 5 Complete: Global Config & Singleton Client
+  - Created Client class as main entry point for the SDK
+  - Client wraps ApiClient and returns appropriate prompt clients (Text/Chat)
+  - Automatic cache creation based on Config settings (cache_ttl, cache_max_size)
+  - Detects prompt type from API response and returns TextPromptClient or ChatPromptClient
+  - Global Langfuse.configure block pattern fully functional
+  - Global Langfuse.client singleton pattern with memoization
+  - Langfuse.reset! for testing (clears configuration and client)
+  - 21 new test examples for Client class
+  - 5 new test examples for global Langfuse module patterns
+  - Coverage: 99.6%, Tests: 187 passing
+
 ---
 
 ## Next Steps
 
-1. Phase 5: Global Config & Singleton Client
-   - Create global Langfuse module methods
-   - Implement Langfuse.configure block pattern
-   - Create Langfuse.client singleton
-   - Update global config to support cache settings
-   - Ensure global client uses cache automatically
+1. Phase 6: Convenience Features
+   - Add compile_and_format helpers for common use cases
+   - Add error handling with fallback prompts
+   - Add debugging/logging helpers
+   - Consider adding prompt validation helpers
 
 ---
 
