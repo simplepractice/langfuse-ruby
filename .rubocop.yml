@@ -67,6 +67,10 @@ RSpec/MessageSpies:
 RSpec/VerifiedDoubles:
   Enabled: false
 
+# Capybara - disable to avoid cop bugs
+Capybara/RSpec/PredicateMatcher:
+  Enabled: false
+
 # Lint
 Lint/EmptyBlock:
   Exclude:
