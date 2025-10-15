@@ -423,7 +423,7 @@ All components are thread-safe:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/langfuse-ruby.git
+git clone https://github.com/langfuse/langfuse-ruby.git
 cd langfuse-ruby
 
 # Install dependencies

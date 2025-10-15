@@ -5,7 +5,6 @@
 coverage/
 
 # Bundler
-Gemfile.lock
 .bundle/
 vendor/bundle/
 

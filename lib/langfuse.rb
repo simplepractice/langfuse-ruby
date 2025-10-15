@@ -75,10 +75,3 @@ module Langfuse
     end
   end
 end
-
-# Require core components as we build them
-# require_relative "langfuse/client"
-# require_relative "langfuse/api_client"
-# require_relative "langfuse/prompt_cache"
-# require_relative "langfuse/text_prompt_client"
-# require_relative "langfuse/chat_prompt_client"

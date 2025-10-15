@@ -3,9 +3,8 @@
 require "simplecov"
 SimpleCov.start do
   add_filter "/spec/"
-  # Coverage requirement will increase as we build out features
-  # Target: 90% by Phase 6
-  minimum_coverage 50
+  # Maintain high coverage standards
+  minimum_coverage 95
 end
 
 require "langfuse"

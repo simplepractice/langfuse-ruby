@@ -423,7 +423,7 @@ RSpec.describe Langfuse::ApiClient do
     # rubocop:enable RSpec/MultipleMemoizedHelpers
 
     context "with retry middleware configuration" do
-      # Note: Direct retry behavior testing is challenging with WebMock due to
+      # NOTE: Direct retry behavior testing is challenging with WebMock due to
       # known incompatibilities. These tests verify the middleware is properly
       # configured. Actual retry behavior is tested in integration tests.
 
@@ -451,7 +451,7 @@ RSpec.describe Langfuse::ApiClient do
 
       it "configures retry for transient error status codes" do
         options = api_client.send(:retry_options)
-        expect(options[:retry_statuses]).to match_array([429, 503, 504])
+        expect(options[:retry_statuses]).to contain_exactly(429, 503, 504)
       end
 
       it "configures retry for network errors" do

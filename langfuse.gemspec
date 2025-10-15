@@ -29,13 +29,10 @@ Gem::Specification.new do |spec|
                         ])
   spec.require_paths = ["lib"]
 
-  # Runtime dependencies - added incrementally as needed
+  # Runtime dependencies
   spec.add_dependency "faraday", "~> 2.0"
   spec.add_dependency "faraday-retry", "~> 2.0"
   spec.add_dependency "mustache", "~> 1.1"
-
-  # Future dependencies:
-  # Phase 2.2+: concurrent-ruby (for thread-safe caching)
 
   # Development dependencies are specified in Gemfile
 end
