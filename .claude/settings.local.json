@@ -3,7 +3,11 @@
     "allow": [
       "Bash(bundle exec rspec:*)",
       "Bash(bundle exec:*)",
-      "Bash(bundle install)"
+      "Bash(bundle install)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(mkdir:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

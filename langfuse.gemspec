@@ -29,10 +29,15 @@ Gem::Specification.new do |spec|
                         ])
   spec.require_paths = ["lib"]
 
-  # Runtime dependencies
+  # Runtime dependencies - HTTP & Templating
   spec.add_dependency "faraday", "~> 2.0"
   spec.add_dependency "faraday-retry", "~> 2.0"
   spec.add_dependency "mustache", "~> 1.1"
+
+  # Runtime dependencies - OpenTelemetry (for tracing)
+  spec.add_dependency "opentelemetry-api", "~> 1.2"
+  spec.add_dependency "opentelemetry-common", "~> 0.21"
+  spec.add_dependency "opentelemetry-sdk", "~> 1.4"
 
   # Development dependencies are specified in Gemfile
 end

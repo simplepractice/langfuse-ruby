@@ -5,6 +5,9 @@ PATH
       faraday (~> 2.0)
       faraday-retry (~> 2.0)
       mustache (~> 1.1)
+      opentelemetry-api (~> 1.2)
+      opentelemetry-common (~> 0.21)
+      opentelemetry-sdk (~> 1.4)
 
 GEM
   remote: https://rubygems.org/
@@ -34,6 +37,18 @@ GEM
     mustache (1.1.1)
     net-http (0.6.0)
       uri
+    opentelemetry-api (1.7.0)
+    opentelemetry-common (0.23.0)
+      opentelemetry-api (~> 1.0)
+    opentelemetry-registry (0.4.0)
+      opentelemetry-api (~> 1.1)
+    opentelemetry-sdk (1.10.0)
+      opentelemetry-api (~> 1.1)
+      opentelemetry-common (~> 0.20)
+      opentelemetry-registry (~> 0.2)
+      opentelemetry-semantic_conventions
+    opentelemetry-semantic_conventions (1.36.0)
+      opentelemetry-api (~> 1.0)
     parallel (1.27.0)
     parser (3.3.9.0)
       ast (~> 2.4.1)

@@ -626,3 +626,284 @@ Extend: `ChatPromptClient#to_langchain`
 
 - **Alternative Considered**: Keep in-memory cache as default, add Rails.cache as opt-in
 - **Why Rejected**: At target scale (1,200+ processes), in-memory cache is fundamentally broken. Better to build correctly from start than support two cache backends.
+
+---
+
+## PHASE 11: GitHub Actions CI/CD (Week 4+)
+*Goal: Automated testing and quality checks on every push and pull request*
+
+### 11.1 Basic CI Workflow ⬜
+Build: `.github/workflows/ci.yml`
+- [ ] Create .github/workflows directory
+- [ ] Set up basic workflow structure
+- [ ] Configure triggers (push to main, pull requests)
+- [ ] Set up Ruby environment with ruby/setup-ruby action
+- [ ] Configure bundler caching for faster builds
+- [ ] Add checkout step
+
+**Files to create:**
+- `.github/workflows/ci.yml`
+
+**Workflow triggers:**
+```yaml
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+```
+
+### 11.2 RSpec Test Job ⬜
+Extend: CI workflow
+- [ ] Add job for running RSpec tests
+- [ ] Run bundle install with caching
+- [ ] Execute bundle exec rspec
+- [ ] Generate test results
+- [ ] Upload SimpleCov coverage artifacts
+- [ ] Set up matrix strategy for multiple Ruby versions (3.2, 3.3)
+
+**Ruby versions to test:**
+- 3.2 (minimum supported - per .ruby-version)
+- 3.3 (latest stable)
+
+**Test job structure:**
+```yaml
+test:
+  strategy:
+    matrix:
+      ruby: ['3.2', '3.3']
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+        bundler-cache: true
+    - run: bundle exec rspec
+    - uses: actions/upload-artifact@v4
+      if: matrix.ruby == '3.3'
+      with:
+        name: coverage
+        path: coverage/
+```
+
+### 11.3 Rubocop Linting Job ⬜
+Extend: CI workflow
+- [ ] Add separate job for Rubocop linting
+- [ ] Run bundle exec rubocop
+- [ ] Fail build on linting errors
+- [ ] Run only on Ruby 3.3 (no need for matrix)
+- [ ] Use annotations for inline PR comments
+
+**Linter job structure:**
+```yaml
+lint:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.3'
+        bundler-cache: true
+    - run: bundle exec rubocop
+```
+
+### 11.4 Coverage Reporting ⬜
+Extend: CI workflow
+- [ ] Add codecov/codecov-action or coverallsapp/github-action
+- [ ] Upload coverage reports from test job
+- [ ] Configure coverage thresholds (90% target)
+- [ ] Generate coverage badge for README
+
+**Coverage action (choose one):**
+```yaml
+# Option 1: Codecov
+- uses: codecov/codecov-action@v3
+  with:
+    files: ./coverage/coverage.json
+    flags: unittests
+    fail_ci_if_error: true
+
+# Option 2: Coveralls
+- uses: coverallsapp/github-action@v2
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    path-to-lcov: ./coverage/lcov.info
+```
+
+### 11.5 Status Badges and README Updates ⬜
+Update: README.md
+- [ ] Add CI status badge
+- [ ] Add coverage badge
+- [ ] Add Ruby version badge
+- [ ] Add gem version badge (when published)
+- [ ] Document CI/CD process
+
+**Badge examples:**
+```markdown
+[![CI](https://github.com/USERNAME/langfuse-ruby/workflows/CI/badge.svg)](https://github.com/USERNAME/langfuse-ruby/actions)
+[![Coverage](https://codecov.io/gh/USERNAME/langfuse-ruby/branch/main/graph/badge.svg)](https://codecov.io/gh/USERNAME/langfuse-ruby)
+[![Ruby Version](https://img.shields.io/badge/ruby-3.2%2B-ruby.svg)](https://www.ruby-lang.org)
+```
+
+### 11.6 Branch Protection Rules ⬜
+Configure: GitHub repository settings
+- [ ] Require status checks to pass before merging
+- [ ] Require test job (both Ruby versions) to pass
+- [ ] Require lint job to pass
+- [ ] Require up-to-date branches before merging
+- [ ] Require pull request reviews (optional)
+
+**Protection rules:**
+- Status checks required: `test (3.2)`, `test (3.3)`, `lint`
+- Require branches to be up to date before merging
+- Include administrators: Yes
+
+### 11.7 Performance Optimization ⬜
+Extend: CI workflow
+- [ ] Add bundler cache key based on Gemfile.lock
+- [ ] Enable parallel test execution (if multiple specs)
+- [ ] Set up dependency caching
+- [ ] Configure workflow concurrency for PR updates
+- [ ] Optimize checkout depth (shallow clone)
+
+**Concurrency configuration:**
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+**Cache optimization:**
+```yaml
+- uses: ruby/setup-ruby@v1
+  with:
+    ruby-version: ${{ matrix.ruby }}
+    bundler-cache: true # Automatically caches gems
+```
+
+### 11.8 Optional: Release Automation ⬜
+Add: `.github/workflows/release.yml` (future phase)
+- [ ] Create release workflow triggered by tags
+- [ ] Build and publish gem to RubyGems.org
+- [ ] Generate changelog from commits
+- [ ] Create GitHub release with notes
+- [ ] Upload gem artifact to release
+
+**Note:** This is a future enhancement for when the gem is ready for public release (post Phase 10).
+
+**Milestone:** Automated testing and quality checks on every commit! 🔄
+
+---
+
+## CI/CD Configuration Example
+
+### Complete `.github/workflows/ci.yml` (Phase 11.1-11.4)
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (Ruby ${{ matrix.ruby }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ['3.2', '3.3']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      - name: Run tests
+        run: bundle exec rspec
+
+      - name: Upload coverage (Ruby 3.3 only)
+        if: matrix.ruby == '3.3'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+      - name: Upload coverage to Codecov
+        if: matrix.ruby == '3.3'
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/coverage.json
+          flags: unittests
+          fail_ci_if_error: false # Don't fail builds for coverage upload issues
+
+  lint:
+    name: Lint (Rubocop)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Run Rubocop
+        run: bundle exec rubocop --format github
+
+  # All jobs must pass for PR merge
+  ci-success:
+    name: CI Success
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          if [ "${{ needs.test.result }}" != "success" ] || [ "${{ needs.lint.result }}" != "success" ]; then
+            echo "One or more CI jobs failed"
+            exit 1
+          fi
+```
+
+### Benefits of This CI/CD Setup
+
+1. **Multi-version Testing**: Ensures compatibility with Ruby 3.2+ as specified
+2. **Fast Feedback**: Parallel test execution across Ruby versions
+3. **Code Quality**: Automated linting prevents style issues
+4. **Coverage Tracking**: Monitors test coverage over time
+5. **Smart Caching**: Bundler cache speeds up builds (typical time: 30s → 10s)
+6. **Concurrency Control**: Cancels outdated PR builds automatically
+7. **Branch Protection**: Prevents merging broken code
+8. **Annotations**: Rubocop errors show inline in PR reviews
+
+### Estimated CI Run Time
+
+- **Initial run** (no cache): ~2-3 minutes
+- **Subsequent runs** (with cache): ~30-45 seconds
+- **Parallel execution**: Test + Lint jobs run simultaneously
+
+### Dependencies Required
+
+**No new gem dependencies** - uses existing:
+- `rspec` (already in Gemfile)
+- `rubocop` (already in Gemfile)
+- `simplecov` (already in Gemfile for coverage)
+
+**GitHub Actions only** - free for public repositories

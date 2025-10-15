@@ -43,12 +43,32 @@ module Langfuse
     # @return [Symbol] Cache backend (:memory or :rails)
     attr_accessor :cache_backend
 
+    # @return [Boolean] Enable tracing functionality
+    attr_accessor :tracing_enabled
+
+    # @return [Boolean] Use async processing for traces (requires ActiveJob)
+    attr_accessor :tracing_async
+
+    # @return [Integer] Number of events to batch before sending
+    attr_accessor :batch_size
+
+    # @return [Integer] Interval in seconds to flush buffered events
+    attr_accessor :flush_interval
+
+    # @return [Symbol] ActiveJob queue name for async processing
+    attr_accessor :job_queue
+
     # Default values
     DEFAULT_BASE_URL = "https://cloud.langfuse.com"
     DEFAULT_TIMEOUT = 5
     DEFAULT_CACHE_TTL = 60
     DEFAULT_CACHE_MAX_SIZE = 1000
     DEFAULT_CACHE_BACKEND = :memory
+    DEFAULT_TRACING_ENABLED = false
+    DEFAULT_TRACING_ASYNC = true
+    DEFAULT_BATCH_SIZE = 50
+    DEFAULT_FLUSH_INTERVAL = 10
+    DEFAULT_JOB_QUEUE = :default
 
     # Initialize a new Config object
     #
@@ -62,6 +82,11 @@ module Langfuse
       @cache_ttl = DEFAULT_CACHE_TTL
       @cache_max_size = DEFAULT_CACHE_MAX_SIZE
       @cache_backend = DEFAULT_CACHE_BACKEND
+      @tracing_enabled = DEFAULT_TRACING_ENABLED
+      @tracing_async = DEFAULT_TRACING_ASYNC
+      @batch_size = DEFAULT_BATCH_SIZE
+      @flush_interval = DEFAULT_FLUSH_INTERVAL
+      @job_queue = DEFAULT_JOB_QUEUE
       @logger = default_logger
 
       yield(self) if block_given?
