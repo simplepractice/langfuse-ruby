@@ -31,9 +31,7 @@ module Langfuse
     # @param timeout [Integer] HTTP request timeout in seconds
     # @param logger [Logger] Logger instance for debugging
     # @param cache [PromptCache, nil] Optional cache for prompt responses
-    # rubocop:disable Metrics/ParameterLists
     def initialize(public_key:, secret_key:, base_url:, timeout: 5, logger: nil, cache: nil)
-      # rubocop:enable Metrics/ParameterLists
       @public_key = public_key
       @secret_key = secret_key
       @base_url = base_url

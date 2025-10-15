@@ -43,18 +43,18 @@ module Langfuse
     # Each message in the prompt will have its content compiled with the
     # provided variables using Mustache templating.
     #
-    # @param variables [Hash] Variables to substitute in message templates
+    # @param kwargs [Hash] Variables to substitute in message templates (as keyword arguments)
     # @return [Array<Hash>] Array of compiled messages with :role and :content keys
     #
     # @example
-    #   chat_prompt.compile(variables: { name: "Alice", topic: "Ruby" })
+    #   chat_prompt.compile(name: "Alice", topic: "Ruby")
     #   # => [
     #   #   { role: :system, content: "You are a helpful assistant." },
     #   #   { role: :user, content: "Hello Alice, let's discuss Ruby!" }
     #   # ]
-    def compile(variables: {})
+    def compile(**kwargs)
       prompt.map do |message|
-        compile_message(message, variables)
+        compile_message(message, kwargs)
       end
     end
 

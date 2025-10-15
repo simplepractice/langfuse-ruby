@@ -103,24 +103,24 @@ RSpec.describe Langfuse::TextPromptClient do
 
     context "with variables" do
       it "substitutes variables in the template" do
-        result = client.compile(variables: { name: "Alice" })
+        result = client.compile(name: "Alice")
         expect(result).to eq("Hello Alice!")
       end
 
       it "handles multiple variables" do
         data = prompt_data.merge("prompt" => "{{greeting}} {{name}}, welcome to {{place}}!")
         client = described_class.new(data)
-        result = client.compile(variables: { greeting: "Hi", name: "Bob", place: "Langfuse" })
+        result = client.compile(greeting: "Hi", name: "Bob", place: "Langfuse")
         expect(result).to eq("Hi Bob, welcome to Langfuse!")
       end
 
       it "handles string keys" do
-        result = client.compile(variables: { "name" => "Charlie" })
+        result = client.compile("name" => "Charlie")
         expect(result).to eq("Hello Charlie!")
       end
 
       it "leaves unmatched placeholders in output" do
-        result = client.compile(variables: {})
+        result = client.compile
         expect(result).to eq("Hello {{name}}!")
       end
     end
@@ -129,12 +129,12 @@ RSpec.describe Langfuse::TextPromptClient do
       it "returns the prompt as-is" do
         data = prompt_data.merge("prompt" => "Hello world!")
         client = described_class.new(data)
-        result = client.compile(variables: {})
+        result = client.compile
         expect(result).to eq("Hello world!")
       end
 
       it "returns the prompt with placeholders when no variables provided" do
-        result = client.compile(variables: {})
+        result = client.compile
         expect(result).to eq("Hello {{name}}!")
       end
     end
@@ -144,9 +144,7 @@ RSpec.describe Langfuse::TextPromptClient do
         data = prompt_data.merge("prompt" => "User: {{user.name}}, Email: {{user.email}}")
         client = described_class.new(data)
         result = client.compile(
-          variables: {
-            user: { name: "Alice", email: "alice@example.com" }
-          }
+          user: { name: "Alice", email: "alice@example.com" }
         )
         expect(result).to eq("User: Alice, Email: alice@example.com")
       end
@@ -155,10 +153,10 @@ RSpec.describe Langfuse::TextPromptClient do
         data = prompt_data.merge("prompt" => "Hello{{#admin}} Admin{{/admin}}!")
         client = described_class.new(data)
 
-        result_admin = client.compile(variables: { admin: true })
+        result_admin = client.compile(admin: true)
         expect(result_admin).to eq("Hello Admin!")
 
-        result_user = client.compile(variables: { admin: false })
+        result_user = client.compile(admin: false)
         expect(result_user).to eq("Hello!")
       end
 
@@ -166,13 +164,11 @@ RSpec.describe Langfuse::TextPromptClient do
         data = prompt_data.merge("prompt" => "Users: {{#users}}{{name}}, {{/users}}")
         client = described_class.new(data)
         result = client.compile(
-          variables: {
-            users: [
-              { name: "Alice" },
-              { name: "Bob" },
-              { name: "Charlie" }
-            ]
-          }
+          users: [
+            { name: "Alice" },
+            { name: "Bob" },
+            { name: "Charlie" }
+          ]
         )
         expect(result).to eq("Users: Alice, Bob, Charlie, ")
       end
@@ -182,22 +178,41 @@ RSpec.describe Langfuse::TextPromptClient do
       it "escapes HTML characters by default" do
         data = prompt_data.merge("prompt" => "Message: {{message}}")
         client = described_class.new(data)
-        result = client.compile(variables: { message: "<script>alert('hi')</script>" })
+        result = client.compile(message: "<script>alert('hi')</script>")
         expect(result).to eq("Message: &lt;script&gt;alert(&#39;hi&#39;)&lt;/script&gt;")
       end
 
       it "escapes quotes but preserves newlines" do
         data = prompt_data.merge("prompt" => "Text: {{text}}")
         client = described_class.new(data)
-        result = client.compile(variables: { text: "Line 1\nLine 2\n\"quoted\"" })
+        result = client.compile(text: "Line 1\nLine 2\n\"quoted\"")
         expect(result).to eq("Text: Line 1\nLine 2\n&quot;quoted&quot;")
       end
 
       it "allows unescaped output with triple braces" do
         data = prompt_data.merge("prompt" => "Message: {{{message}}}")
         client = described_class.new(data)
-        result = client.compile(variables: { message: "<script>alert('hi')</script>" })
+        result = client.compile(message: "<script>alert('hi')</script>")
         expect(result).to eq("Message: <script>alert('hi')</script>")
+      end
+    end
+
+    context "with keyword arguments (new API style)" do
+      it "accepts variables as direct keyword arguments" do
+        result = client.compile(name: "Alice")
+        expect(result).to eq("Hello Alice!")
+      end
+
+      it "works with no arguments" do
+        result = client.compile
+        expect(result).to eq("Hello {{name}}!")
+      end
+
+      it "handles multiple keyword arguments" do
+        data = prompt_data.merge("prompt" => "{{greeting}} {{name}}, welcome to {{place}}!")
+        client = described_class.new(data)
+        result = client.compile(greeting: "Hi", name: "Bob", place: "Langfuse")
+        expect(result).to eq("Hi Bob, welcome to Langfuse!")
       end
     end
   end

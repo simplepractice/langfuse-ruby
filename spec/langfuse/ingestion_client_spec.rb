@@ -211,9 +211,9 @@ RSpec.describe Langfuse::IngestionClient do
 
     it "retries on timeout" do
       stub = stub_request(:post, "#{base_url}/api/public/ingestion")
-        .to_timeout.times(2)
-        .then
-        .to_return(status: 200, body: {}.to_json)
+             .to_timeout.times(2)
+             .then
+             .to_return(status: 200, body: {}.to_json)
 
       expect(client.send_batch(events)).to be(true)
       expect(stub).to have_been_requested.times(3)
@@ -221,9 +221,9 @@ RSpec.describe Langfuse::IngestionClient do
 
     it "retries on 503 Service Unavailable" do
       stub = stub_request(:post, "#{base_url}/api/public/ingestion")
-        .to_return(status: 503).times(2)
-        .then
-        .to_return(status: 200, body: {}.to_json)
+             .to_return(status: 503).times(2)
+             .then
+             .to_return(status: 200, body: {}.to_json)
 
       expect(client.send_batch(events)).to be(true)
       expect(stub).to have_been_requested.times(3)
@@ -231,9 +231,9 @@ RSpec.describe Langfuse::IngestionClient do
 
     it "retries on 429 Too Many Requests" do
       stub = stub_request(:post, "#{base_url}/api/public/ingestion")
-        .to_return(status: 429).times(2)
-        .then
-        .to_return(status: 200, body: {}.to_json)
+             .to_return(status: 429).times(2)
+             .then
+             .to_return(status: 200, body: {}.to_json)
 
       expect(client.send_batch(events)).to be(true)
       expect(stub).to have_been_requested.times(3)
@@ -241,7 +241,7 @@ RSpec.describe Langfuse::IngestionClient do
 
     it "does not retry on 400 Bad Request" do
       stub = stub_request(:post, "#{base_url}/api/public/ingestion")
-        .to_return(status: 400, body: { error: "Bad request" }.to_json)
+             .to_return(status: 400, body: { error: "Bad request" }.to_json)
 
       expect { client.send_batch(events) }.to raise_error(Langfuse::ApiError)
       expect(stub).to have_been_requested.times(1) # No retries
@@ -249,7 +249,7 @@ RSpec.describe Langfuse::IngestionClient do
 
     it "exhausts retries and raises error" do
       stub = stub_request(:post, "#{base_url}/api/public/ingestion")
-        .to_return(status: 500).times(4) # More than max retries
+             .to_return(status: 500).times(4) # More than max retries
 
       expect { client.send_batch(events) }.to raise_error(Langfuse::ApiError)
       expect(stub).to have_been_requested.times(4) # 1 initial + 3 retries

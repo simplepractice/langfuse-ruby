@@ -39,16 +39,16 @@ module Langfuse
 
     # Compile the prompt with variable substitution
     #
-    # @param variables [Hash] Variables to substitute in the template
+    # @param kwargs [Hash] Variables to substitute in the template (as keyword arguments)
     # @return [String] The compiled prompt text
     #
     # @example
-    #   text_prompt.compile(variables: { name: "Alice", greeting: "Hi" })
+    #   text_prompt.compile(name: "Alice", greeting: "Hi")
     #   # => "Hi Alice! Welcome."
-    def compile(variables: {})
-      return prompt if variables.empty?
+    def compile(**kwargs)
+      return prompt if kwargs.empty?
 
-      Mustache.render(prompt, variables)
+      Mustache.render(prompt, kwargs)
     end
 
     private

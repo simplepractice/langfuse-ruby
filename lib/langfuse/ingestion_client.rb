@@ -67,9 +67,7 @@ module Langfuse
         req.body = { batch: events }.to_json
       end
 
-      unless response.success?
-        raise ApiError, "Ingestion failed (#{response.status}): #{response.body}"
-      end
+      raise ApiError, "Ingestion failed (#{response.status}): #{response.body}" unless response.success?
 
       true
     rescue Faraday::Error => e

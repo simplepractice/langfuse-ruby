@@ -113,7 +113,7 @@ module Langfuse
     #   )
     def compile_prompt(name, variables: {}, version: nil, label: nil, fallback: nil, type: nil)
       prompt = get_prompt(name, version: version, label: label, fallback: fallback, type: type)
-      prompt.compile(variables: variables)
+      prompt.compile(**variables)
     end
 
     private

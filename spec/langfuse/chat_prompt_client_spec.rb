@@ -119,7 +119,7 @@ RSpec.describe Langfuse::ChatPromptClient do
 
     context "with variables" do
       it "substitutes variables in all messages" do
-        result = client.compile(variables: { company_name: "Acme Corp", issue: "login problems" })
+        result = client.compile(company_name: "Acme Corp", issue: "login problems")
 
         expect(result).to eq([
                                { role: :system, content: "You are a helpful assistant for Acme Corp." },
@@ -128,14 +128,14 @@ RSpec.describe Langfuse::ChatPromptClient do
       end
 
       it "returns messages with symbol keys for role" do
-        result = client.compile(variables: { company_name: "Test", issue: "test" })
+        result = client.compile(company_name: "Test", issue: "test")
 
         expect(result[0][:role]).to eq(:system)
         expect(result[1][:role]).to eq(:user)
       end
 
       it "handles string variable keys" do
-        result = client.compile(variables: { "company_name" => "Test Co", "issue" => "billing" })
+        result = client.compile("company_name" => "Test Co", "issue" => "billing")
 
         expect(result[0][:content]).to include("Test Co")
         expect(result[1][:content]).to include("billing")
@@ -144,7 +144,7 @@ RSpec.describe Langfuse::ChatPromptClient do
 
     context "without variables" do
       it "returns messages with unsubstituted placeholders" do
-        result = client.compile(variables: {})
+        result = client.compile
 
         expect(result).to eq([
                                { role: :system, content: "You are a helpful assistant for {{company_name}}." },
@@ -157,7 +157,7 @@ RSpec.describe Langfuse::ChatPromptClient do
         data["prompt"] = [{ "role" => "system", "content" => "You are helpful." }]
         client = described_class.new(data)
 
-        result = client.compile(variables: {})
+        result = client.compile
 
         expect(result).to eq([
                                { role: :system, content: "You are helpful." }
@@ -175,7 +175,7 @@ RSpec.describe Langfuse::ChatPromptClient do
         ]
         client = described_class.new(data)
 
-        result = client.compile(variables: {})
+        result = client.compile
 
         expect(result.map { |m| m[:role] }).to eq(%i[system user assistant])
       end
@@ -188,7 +188,7 @@ RSpec.describe Langfuse::ChatPromptClient do
         ]
         client = described_class.new(data)
 
-        result = client.compile(variables: {})
+        result = client.compile
 
         expect(result[0][:role]).to eq(:system)
         expect(result[1][:role]).to eq(:user)
@@ -207,9 +207,7 @@ RSpec.describe Langfuse::ChatPromptClient do
         client = described_class.new(data)
 
         result = client.compile(
-          variables: {
-            user: { name: "Alice", email: "alice@example.com" }
-          }
+          user: { name: "Alice", email: "alice@example.com" }
         )
 
         expect(result[0][:content]).to eq("User: Alice, Email: alice@example.com")
@@ -225,14 +223,13 @@ RSpec.describe Langfuse::ChatPromptClient do
         ]
         client = described_class.new(data)
 
-        result_premium = client.compile(variables: { premium: true })
+        result_premium = client.compile(premium: true)
         expect(result_premium[0][:content]).to eq("Hello Premium User!")
 
-        result_basic = client.compile(variables: { premium: false })
+        result_basic = client.compile(premium: false)
         expect(result_basic[0][:content]).to eq("Hello!")
       end
 
-      # rubocop:disable RSpec/ExampleLength
       it "handles list iteration" do
         data = prompt_data.dup
         data["prompt"] = [
@@ -244,18 +241,15 @@ RSpec.describe Langfuse::ChatPromptClient do
         client = described_class.new(data)
 
         result = client.compile(
-          variables: {
-            options: [
-              { name: "Option A" },
-              { name: "Option B" },
-              { name: "Option C" }
-            ]
-          }
+          options: [
+            { name: "Option A" },
+            { name: "Option B" },
+            { name: "Option C" }
+          ]
         )
 
         expect(result[0][:content]).to eq("Available options: Option A, Option B, Option C, ")
       end
-      # rubocop:enable RSpec/ExampleLength
     end
 
     context "with multiple messages" do
@@ -268,7 +262,7 @@ RSpec.describe Langfuse::ChatPromptClient do
         ]
         client = described_class.new(data)
 
-        result = client.compile(variables: { app_name: "MyApp", user_name: "Bob" })
+        result = client.compile(app_name: "MyApp", user_name: "Bob")
 
         expect(result).to eq([
                                { role: :system, content: "Welcome to MyApp" },
@@ -285,7 +279,7 @@ RSpec.describe Langfuse::ChatPromptClient do
         ]
         client = described_class.new(data)
 
-        result = client.compile(variables: { var1: "A", var2: "B" })
+        result = client.compile(var1: "A", var2: "B")
 
         expect(result[0][:content]).to eq("System A")
         expect(result[1][:content]).to eq("User B")
@@ -300,7 +294,7 @@ RSpec.describe Langfuse::ChatPromptClient do
         ]
         client = described_class.new(data)
 
-        result = client.compile(variables: { message: "<script>alert('xss')</script>" })
+        result = client.compile(message: "<script>alert('xss')</script>")
 
         expect(result[0][:content]).to eq("Message: &lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;")
       end
@@ -312,7 +306,7 @@ RSpec.describe Langfuse::ChatPromptClient do
         ]
         client = described_class.new(data)
 
-        result = client.compile(variables: { html: "<b>bold</b>" })
+        result = client.compile(html: "<b>bold</b>")
 
         expect(result[0][:content]).to eq("HTML: <b>bold</b>")
       end
@@ -324,7 +318,7 @@ RSpec.describe Langfuse::ChatPromptClient do
         data["prompt"] = [{ "role" => "system", "content" => "" }]
         client = described_class.new(data)
 
-        result = client.compile(variables: {})
+        result = client.compile
 
         expect(result).to eq([{ role: :system, content: "" }])
       end
@@ -334,9 +328,41 @@ RSpec.describe Langfuse::ChatPromptClient do
         data["prompt"] = [{ "role" => "system" }]
         client = described_class.new(data)
 
-        result = client.compile(variables: {})
+        result = client.compile
 
         expect(result).to eq([{ role: :system, content: "" }])
+      end
+    end
+
+    context "with keyword arguments (new API style)" do
+      it "accepts variables as direct keyword arguments" do
+        result = client.compile(company_name: "Acme Corp", issue: "login problems")
+
+        expect(result).to eq([
+                               { role: :system, content: "You are a helpful assistant for Acme Corp." },
+                               { role: :user, content: "Hello, I need help with login problems." }
+                             ])
+      end
+
+      it "works with no arguments" do
+        result = client.compile
+
+        expect(result).to eq([
+                               { role: :system, content: "You are a helpful assistant for {{company_name}}." },
+                               { role: :user, content: "Hello, I need help with {{issue}}." }
+                             ])
+      end
+
+      it "handles single variable" do
+        data = prompt_data.dup
+        data["prompt"] = [{ "role" => "user", "content" => "{{text}}" }]
+        client = described_class.new(data)
+
+        result = client.compile(text: "Buy cheap meds now!!")
+
+        expect(result).to eq([
+                               { role: :user, content: "Buy cheap meds now!!" }
+                             ])
       end
     end
   end

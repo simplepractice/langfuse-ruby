@@ -8,14 +8,14 @@ Official Ruby SDK for [Langfuse](https://langfuse.com) - Open-source LLM observa
 
 ## Features
 
-✅ **Prompt Management** - Fetch and compile prompts with variable substitution
-✅ **In-Memory Caching** - Thread-safe caching with TTL and LRU eviction
-✅ **Text & Chat Prompts** - Support for both simple text and chat/completion prompts
-✅ **Mustache Templating** - Logic-less variable substitution
-✅ **Rails-Friendly** - Global configuration pattern with `Langfuse.configure`
-✅ **Thread-Safe** - Safe for multi-threaded environments
-🚧 **LLM Tracing** - Coming soon
-🚧 **Observability** - Coming soon
+- ✅ **Prompt Management** - Fetch and compile prompts with variable substitution
+- ✅ **In-Memory Caching** - Thread-safe caching with TTL and LRU eviction
+- ✅ **Text & Chat Prompts** - Support for both simple text and chat/completion prompts
+- ✅ **Mustache Templating** - Logic-less variable substitution
+- ✅ **Rails-Friendly** - Global configuration pattern with `Langfuse.configure`
+- ✅ **Thread-Safe** - Safe for multi-threaded environments
+- 🚧 **LLM Tracing** - Coming soon
+- 🚧 **Observability** - Coming soon
 
 ## Installation
 

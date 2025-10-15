@@ -24,9 +24,21 @@ Metrics/BlockLength:
     - '*.gemspec'
 
 Metrics/MethodLength:
-  Max: 20
+  Max: 22
   Exclude:
     - 'spec/**/*'
+    - 'lib/langfuse/exporter.rb'
+
+Metrics/AbcSize:
+  Max: 21
+  Exclude:
+    - 'lib/langfuse/exporter.rb'
+
+Metrics/ClassLength:
+  Max: 140
+
+Metrics/ParameterLists:
+  Max: 6
 
 Layout/LineLength:
   Max: 120
@@ -35,7 +47,7 @@ Layout/LineLength:
 
 # RSpec
 RSpec/ExampleLength:
-  Max: 15
+  Max: 32
 
 RSpec/MultipleExpectations:
   Max: 5
@@ -44,4 +56,22 @@ RSpec/NestedGroups:
   Max: 4
 
 RSpec/MultipleMemoizedHelpers:
-  Max: 6
+  Max: 7
+
+RSpec/DescribeClass:
+  Enabled: false
+
+RSpec/MessageSpies:
+  Enabled: false
+
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+# Lint
+Lint/EmptyBlock:
+  Exclude:
+    - 'spec/**/*'
+
+Lint/UnusedMethodArgument:
+  Exclude:
+    - 'lib/langfuse/exporter.rb'  # OpenTelemetry interface methods

@@ -49,12 +49,12 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
 
       it "sets tags as JSON array" do
         span_data = nil
-        tracer.trace(name: "test-trace", tags: ["production", "critical"]) do |trace|
+        tracer.trace(name: "test-trace", tags: %w[production critical]) do |trace|
           span_data = trace.otel_span.to_span_data
         end
 
         tags = JSON.parse(span_data.attributes["langfuse.tags"])
-        expect(tags).to eq(["production", "critical"])
+        expect(tags).to eq(%w[production critical])
       end
     end
   end
@@ -194,12 +194,12 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
             results << "level-1"
             span1.span(name: "level-2") do |span2|
               results << "level-2"
-              expect(span2).to be_a(Langfuse::Span)
+              expect(span2).to be_a(described_class)
             end
           end
         end
 
-        expect(results).to eq(["level-1", "level-2"])
+        expect(results).to eq(%w[level-1 level-2])
       end
     end
 
@@ -291,10 +291,10 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
 
         usage = JSON.parse(gen_data.attributes["langfuse.usage"])
         expect(usage).to eq({
-          "prompt_tokens" => 100,
-          "completion_tokens" => 50,
-          "total_tokens" => 150
-        })
+                              "prompt_tokens" => 100,
+                              "completion_tokens" => 50,
+                              "total_tokens" => 150
+                            })
       end
     end
 
@@ -402,14 +402,14 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
         results << "trace-end"
       end
 
-      expect(results).to eq([
-        "trace-start",
-        "retrieval-start",
-        "retrieval-end",
-        "generation-start",
-        "generation-end",
-        "trace-end"
-      ])
+      expect(results).to eq(%w[
+                              trace-start
+                              retrieval-start
+                              retrieval-end
+                              generation-start
+                              generation-end
+                              trace-end
+                            ])
     end
   end
 end

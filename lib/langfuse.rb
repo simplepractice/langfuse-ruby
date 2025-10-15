@@ -108,7 +108,7 @@ module Langfuse
     #     end
     #   end
     #
-    def trace(name:, user_id: nil, session_id: nil, metadata: nil, tags: nil, context: nil, &block)
+    def trace(name:, user_id: nil, session_id: nil, metadata: nil, tags: nil, context: nil, &)
       tracer.trace(
         name: name,
         user_id: user_id,
@@ -116,7 +116,7 @@ module Langfuse
         metadata: metadata,
         tags: tags,
         context: context,
-        &block
+        &
       )
     end
 

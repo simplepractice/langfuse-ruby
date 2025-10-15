@@ -387,7 +387,6 @@ RSpec.describe Langfuse::ApiClient do
         expect(cache.get(cache_key)).not_to be_nil
       end
 
-      # rubocop:disable RSpec/ExampleLength
       it "caches different versions separately" do
         stub_request(:get, "#{base_url}/api/public/v2/prompts/#{prompt_name}")
           .with(query: { version: "1" })
@@ -418,7 +417,6 @@ RSpec.describe Langfuse::ApiClient do
             .with(query: { version: "2" })
         ).to have_been_made.once
       end
-      # rubocop:enable RSpec/ExampleLength
     end
     # rubocop:enable RSpec/MultipleMemoizedHelpers
 
