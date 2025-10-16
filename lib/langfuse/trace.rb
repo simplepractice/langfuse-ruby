@@ -132,6 +132,54 @@ module Langfuse
       carrier
     end
 
+    # Set the input of this trace
+    #
+    # @param value [Object] The input value (will be JSON-encoded)
+    # @return [void]
+    #
+    # @example
+    #   trace.input = { query: "What is Ruby?" }
+    #
+    def input=(value)
+      @otel_span.set_attribute("langfuse.input", value.to_json)
+    end
+
+    # Set the output of this trace
+    #
+    # @param value [Object] The output value (will be JSON-encoded)
+    # @return [void]
+    #
+    # @example
+    #   trace.output = { answer: "Ruby is a programming language" }
+    #
+    def output=(value)
+      @otel_span.set_attribute("langfuse.output", value.to_json)
+    end
+
+    # Set metadata for this trace
+    #
+    # @param value [Hash] Metadata hash (will be JSON-encoded)
+    # @return [void]
+    #
+    # @example
+    #   trace.metadata = { source: "api", cache: "miss" }
+    #
+    def metadata=(value)
+      @otel_span.set_attribute("langfuse.metadata", value.to_json)
+    end
+
+    # Set the level of this trace
+    #
+    # @param value [String] Level (debug, default, warning, error)
+    # @return [void]
+    #
+    # @example
+    #   trace.level = "warning"
+    #
+    def level=(value)
+      @otel_span.set_attribute("langfuse.level", value)
+    end
+
     private
 
     # Build OTel attributes for a span

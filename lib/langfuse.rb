@@ -90,6 +90,8 @@ module Langfuse
     # @param name [String] Name of the trace
     # @param user_id [String, nil] Optional user ID
     # @param session_id [String, nil] Optional session ID
+    # @param input [Object, nil] Optional input data (will be JSON-encoded)
+    # @param output [Object, nil] Optional output data (will be JSON-encoded)
     # @param metadata [Hash, nil] Optional metadata hash
     # @param tags [Array<String>, nil] Optional tags array
     # @param context [OpenTelemetry::Context, nil] Optional parent context for distributed tracing
@@ -98,7 +100,7 @@ module Langfuse
     # @return [Object] The return value of the block
     #
     # @example
-    #   Langfuse.trace(name: "user-request", user_id: "user-123") do |trace|
+    #   Langfuse.trace(name: "user-request", user_id: "user-123", input: { query: "..." }) do |trace|
     #     trace.span(name: "database-query") do |span|
     #       # Do work
     #     end
@@ -108,11 +110,13 @@ module Langfuse
     #     end
     #   end
     #
-    def trace(name:, user_id: nil, session_id: nil, metadata: nil, tags: nil, context: nil, &)
+    def trace(name:, user_id: nil, session_id: nil, input: nil, output: nil, metadata: nil, tags: nil, context: nil, &)
       tracer.trace(
         name: name,
         user_id: user_id,
         session_id: session_id,
+        input: input,
+        output: output,
         metadata: metadata,
         tags: tags,
         context: context,

@@ -130,6 +130,8 @@ module Langfuse
           name: span_data.name,
           user_id: attributes["langfuse.user_id"],
           session_id: attributes["langfuse.session_id"],
+          input: parse_json_attribute(attributes["langfuse.input"]),
+          output: parse_json_attribute(attributes["langfuse.output"]),
           metadata: parse_json_attribute(attributes["langfuse.metadata"]),
           tags: parse_json_attribute(attributes["langfuse.tags"]),
           timestamp: format_timestamp(span_data.start_timestamp)
