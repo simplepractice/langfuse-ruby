@@ -9,13 +9,13 @@ Official Ruby SDK for [Langfuse](https://langfuse.com) - Open-source LLM observa
 ## Features
 
 - ✅ **Prompt Management** - Fetch and compile prompts with variable substitution
+- ✅ **LLM Tracing & Observability** - Built on OpenTelemetry for distributed tracing
 - ✅ **In-Memory Caching** - Thread-safe caching with TTL and LRU eviction
 - ✅ **Text & Chat Prompts** - Support for both simple text and chat/completion prompts
 - ✅ **Mustache Templating** - Logic-less variable substitution
 - ✅ **Rails-Friendly** - Global configuration pattern with `Langfuse.configure`
 - ✅ **Thread-Safe** - Safe for multi-threaded environments
-- 🚧 **LLM Tracing** - Coming soon
-- 🚧 **Observability** - Coming soon
+- ✅ **APM Integration** - Works with Datadog, New Relic, Honeycomb, etc.
 
 ## Installation
 
@@ -88,7 +88,11 @@ puts prompt.version     # => 3
 puts prompt.labels      # => ["production"]
 puts prompt.tags        # => ["email", "customer"]
 
-# Compile with variables
+# The raw template stored in Langfuse looks like this:
+puts prompt.prompt
+# => "Dear {{customer_name}}, your order #{{order_number}} for {{total}} has shipped!"
+
+# Compile with variables to populate the template
 email = prompt.compile(
   customer_name: "Alice",
   order_number: "12345",
@@ -96,6 +100,16 @@ email = prompt.compile(
 )
 puts email
 # => "Dear Alice, your order #12345 for $99.99 has shipped!"
+```
+
+**Template in Langfuse:**
+```
+Dear {{customer_name}}, your order #{{order_number}} for {{total}} has shipped!
+```
+
+**After compilation:**
+```
+Dear Alice, your order #12345 for $99.99 has shipped!
 ```
 
 ### Chat Prompts
@@ -106,13 +120,27 @@ Chat prompts return arrays of messages for LLM APIs (OpenAI, Anthropic, etc.):
 # Fetch a chat prompt
 prompt = Langfuse.client.get_prompt("support-assistant")
 
-# Compile with variables
+# The raw template stored in Langfuse looks like this:
+puts prompt.prompt
+# => [
+#      { "role" => "system", "content" => "You are a {{support_level}} support agent for {{company_name}}." },
+#      { "role" => "user", "content" => "How can I help you today?" }
+#    ]
+
+# Compile with variables to populate the template
 messages = prompt.compile(
   company_name: "Acme Corp",
   support_level: "premium"
 )
 
-# Use with OpenAI
+# Result is ready to use with OpenAI, Anthropic, etc.
+puts messages
+# => [
+#      { role: :system, content: "You are a premium support agent for Acme Corp." },
+#      { role: :user, content: "How can I help you today?" }
+#    ]
+
+# Use directly with OpenAI
 require 'openai'
 client = OpenAI::Client.new
 response = client.chat(
@@ -123,7 +151,21 @@ response = client.chat(
 )
 ```
 
-Example output:
+**Template in Langfuse:**
+```json
+[
+  {
+    "role": "system",
+    "content": "You are a {{support_level}} support agent for {{company_name}}."
+  },
+  {
+    "role": "user",
+    "content": "How can I help you today?"
+  }
+]
+```
+
+**After compilation:**
 ```ruby
 [
   { role: :system, content: "You are a premium support agent for Acme Corp." },
@@ -147,35 +189,380 @@ staging_prompt = Langfuse.client.get_prompt("greeting", label: "staging")
 
 The SDK uses Mustache for powerful, logic-less templating:
 
+#### Nested Objects
+
+**Template in Langfuse:**
+```
+Hello {{user.name}}, we'll email you at {{user.email}}
+```
+
+**Ruby code:**
 ```ruby
-# Nested objects
 prompt.compile(
   user: {
     name: "Alice",
     email: "alice@example.com"
   }
 )
-# Template: "Hello {{user.name}}, we'll email you at {{user.email}}"
-# Result: "Hello Alice, we'll email you at alice@example.com"
+```
 
-# Lists
+**Result:**
+```
+Hello Alice, we'll email you at alice@example.com
+```
+
+#### Lists/Arrays
+
+**Template in Langfuse:**
+```
+{{#items}}• {{name}}: ${{price}}
+{{/items}}
+```
+
+**Ruby code:**
+```ruby
 prompt.compile(
   items: [
     { name: "Apple", price: 1.99 },
     { name: "Banana", price: 0.99 }
   ]
 )
-# Template: "{{#items}}• {{name}}: ${{price}}\n{{/items}}"
-# Result: "• Apple: $1.99\n• Banana: $0.99\n"
+```
 
-# HTML escaping (automatic by default)
+**Result:**
+```
+• Apple: $1.99
+• Banana: $0.99
+```
+
+#### HTML Escaping
+
+**Template in Langfuse:**
+```
+User input: {{content}}
+```
+
+**Ruby code:**
+```ruby
 prompt.compile(content: "<script>alert('xss')</script>")
-# Result: "&lt;script&gt;alert('xss')&lt;/script&gt;"
+```
 
-# Disable escaping with triple braces
-# Template: "{{{raw_html}}}"
+**Result (automatic escaping):**
+```
+User input: &lt;script&gt;alert('xss')&lt;/script&gt;
+```
+
+#### Raw/Unescaped Output
+
+**Template in Langfuse:**
+```
+{{{raw_html}}}
+```
+
+**Ruby code:**
+```ruby
 prompt.compile(raw_html: "<strong>Bold</strong>")
-# Result: "<strong>Bold</strong>"
+```
+
+**Result (no escaping with triple braces):**
+```
+<strong>Bold</strong>
+```
+
+## LLM Tracing & Observability
+
+The SDK provides comprehensive LLM tracing built on **OpenTelemetry**, the CNCF standard for distributed tracing. Traces capture LLM calls, nested operations, token usage, and costs, giving you complete visibility into your LLM application.
+
+### Basic Trace with Generation
+
+```ruby
+# Trace a single LLM call
+Langfuse.trace(name: "chat-completion", user_id: "user-123") do |trace|
+  trace.generation(
+    name: "openai-call",
+    model: "gpt-4",
+    input: [{ role: "user", content: "Hello, how are you?" }]
+  ) do |gen|
+    # Call your LLM
+    response = openai_client.chat(
+      parameters: {
+        model: "gpt-4",
+        messages: [{ role: "user", content: "Hello, how are you?" }]
+      }
+    )
+
+    # Capture output and usage
+    gen.output = response.choices.first.message.content
+    gen.usage = {
+      prompt_tokens: response.usage.prompt_tokens,
+      completion_tokens: response.usage.completion_tokens,
+      total_tokens: response.usage.total_tokens
+    }
+  end
+end
+```
+
+### Nested Spans (RAG Pipeline Example)
+
+```ruby
+Langfuse.trace(name: "rag-query", user_id: "user-456", session_id: "session-789") do |trace|
+  # Document retrieval span
+  docs = trace.span(name: "retrieval", input: { query: "What is Ruby?" }) do |span|
+    # Generate embedding
+    embedding = span.generation(
+      name: "embed-query",
+      model: "text-embedding-ada-002",
+      input: "What is Ruby?"
+    ) do |gen|
+      result = openai_client.embeddings(
+        parameters: { model: "text-embedding-ada-002", input: "What is Ruby?" }
+      )
+      gen.output = result.data.first.embedding
+      gen.usage = { total_tokens: result.usage.total_tokens }
+      result.data.first.embedding
+    end
+
+    # Search vector database
+    results = vector_db.search(embedding, limit: 5)
+    span.output = { results: results, count: results.size }
+    span.metadata = { latency_ms: 42 }
+    results
+  end
+
+  # LLM generation with retrieved context
+  trace.generation(
+    name: "gpt4-completion",
+    model: "gpt-4",
+    input: build_prompt_with_context(docs),
+    model_parameters: { temperature: 0.7 }
+  ) do |gen|
+    response = openai_client.chat(...)
+    gen.output = response.choices.first.message.content
+    gen.usage = {
+      prompt_tokens: response.usage.prompt_tokens,
+      completion_tokens: response.usage.completion_tokens,
+      total_tokens: response.usage.total_tokens
+    }
+  end
+
+  # Track user feedback
+  trace.event(name: "user-feedback", input: { rating: "thumbs_up" })
+end
+```
+
+### Automatic Prompt Linking
+
+When using prompts from the SDK, they're automatically linked to your traces:
+
+```ruby
+# Fetch a prompt
+prompt = Langfuse.client.get_prompt("support-assistant", version: 3)
+
+Langfuse.trace(name: "support-query") do |trace|
+  trace.generation(
+    name: "response",
+    model: "gpt-4",
+    prompt: prompt  # ← Automatically captured!
+  ) do |gen|
+    # Compile prompt with variables
+    messages = prompt.compile(customer_name: "Alice", issue: "login problem")
+
+    response = openai_client.chat(parameters: { model: "gpt-4", messages: messages })
+    gen.output = response.choices.first.message.content
+    gen.usage = {
+      prompt_tokens: response.usage.prompt_tokens,
+      completion_tokens: response.usage.completion_tokens,
+      total_tokens: response.usage.total_tokens
+    }
+  end
+end
+
+# The trace will show:
+# - prompt_name: "support-assistant"
+# - prompt_version: 3
+# - input: [compiled messages]
+```
+
+### Spans and Metadata
+
+Track any operation as a span with custom metadata:
+
+```ruby
+Langfuse.trace(name: "document-processing") do |trace|
+  trace.span(name: "pdf-parsing", input: { file: "report.pdf" }) do |span|
+    parsed_data = parse_pdf("report.pdf")
+    span.output = { pages: parsed_data.pages, text_length: parsed_data.text.length }
+    span.metadata = { file_size_mb: 2.5, parse_time_ms: 150 }
+  end
+
+  trace.span(name: "text-analysis") do |span|
+    span.metadata = { model: "custom-analyzer", version: "1.2" }
+    # ... analysis logic
+  end
+end
+```
+
+### Events
+
+Add point-in-time events to traces:
+
+```ruby
+Langfuse.trace(name: "user-conversation") do |trace|
+  # User starts conversation
+  trace.event(name: "conversation-started", input: { channel: "web" })
+
+  # LLM generation
+  trace.generation(name: "response", model: "gpt-4") do |gen|
+    # ... LLM call
+  end
+
+  # User provides feedback
+  trace.event(name: "user-feedback", input: { rating: "thumbs_up", comment: "Very helpful!" })
+end
+```
+
+### Observability Levels
+
+Control the visibility of traces with levels:
+
+```ruby
+Langfuse.trace(name: "production-query") do |trace|
+  trace.span(name: "database-query") do |span|
+    span.level = "debug"  # Options: debug, default, warning, error
+    # ...
+  end
+
+  trace.generation(name: "llm-call", model: "gpt-4") do |gen|
+    begin
+      # ... LLM call
+    rescue => e
+      gen.level = "error"
+      raise
+    end
+  end
+end
+```
+
+### Distributed Tracing
+
+The SDK supports distributed tracing across microservices using W3C Trace Context:
+
+```ruby
+# Service A (API Gateway)
+def handle_request
+  Langfuse.trace(name: "api-request", user_id: "user-123") do |trace|
+    # Inject trace context into HTTP headers
+    headers = trace.inject_context
+
+    # Call downstream service with trace context
+    response = HTTParty.post(
+      "http://service-b/process",
+      headers: headers,
+      body: { query: "..." }
+    )
+  end
+end
+
+# Service B (Processing Service)
+def process_request(request)
+  # Extract context from incoming headers
+  context = Langfuse.extract_context(request.headers)
+
+  # This trace is automatically linked to the parent trace!
+  Langfuse.trace(name: "process-data", context: context) do |trace|
+    trace.generation(name: "llm-call", model: "gpt-4") do |gen|
+      # ... LLM processing
+    end
+  end
+end
+```
+
+### OpenTelemetry Integration
+
+The SDK is built on OpenTelemetry, which means:
+
+- **Automatic Context Propagation**: Trace context flows automatically through your application
+- **APM Integration**: Traces appear in Datadog, New Relic, Honeycomb, etc.
+- **Rich Instrumentation**: Works with existing OTel instrumentation (HTTP, Rails, Sidekiq)
+- **Industry Standard**: Uses W3C Trace Context for distributed tracing
+
+To enable OpenTelemetry setup:
+
+```ruby
+# config/initializers/opentelemetry.rb
+require 'opentelemetry/sdk'
+require 'langfuse/otel_setup'
+
+# Initialize OpenTelemetry with Langfuse
+Langfuse::OtelSetup.configure do |config|
+  config.service_name = 'my-rails-app'
+  config.service_version = ENV['APP_VERSION']
+end
+```
+
+### Complete Example: Q&A with RAG
+
+```ruby
+def answer_question(user_id:, question:)
+  Langfuse.trace(name: "qa-request", user_id: user_id, metadata: { question: question }) do |trace|
+    # Step 1: Retrieve relevant documents
+    documents = trace.span(name: "document-retrieval", input: { query: question }) do |span|
+      # Generate embedding for question
+      embedding = span.generation(
+        name: "embed-question",
+        model: "text-embedding-ada-002",
+        input: question
+      ) do |gen|
+        result = generate_embedding(question)
+        gen.output = result[:embedding]
+        gen.usage = { total_tokens: result[:tokens] }
+        result[:embedding]
+      end
+
+      # Search vector database
+      docs = vector_db.similarity_search(embedding, limit: 3)
+      span.output = { doc_ids: docs.map(&:id), count: docs.size }
+      docs
+    end
+
+    # Step 2: Generate answer with LLM
+    prompt = Langfuse.client.get_prompt("qa-with-context", label: "production")
+
+    answer = trace.generation(
+      name: "generate-answer",
+      model: "gpt-4",
+      prompt: prompt,
+      model_parameters: { temperature: 0.3, max_tokens: 500 }
+    ) do |gen|
+      messages = prompt.compile(
+        question: question,
+        context: documents.map(&:content).join("\n\n")
+      )
+
+      response = openai_client.chat(
+        parameters: { model: "gpt-4", messages: messages, temperature: 0.3 }
+      )
+
+      gen.output = response.choices.first.message.content
+      gen.usage = {
+        prompt_tokens: response.usage.prompt_tokens,
+        completion_tokens: response.usage.completion_tokens,
+        total_tokens: response.usage.total_tokens
+      }
+
+      response.choices.first.message.content
+    end
+
+    # Step 3: Log result event
+    trace.event(
+      name: "answer-generated",
+      input: { question: question },
+      output: { answer: answer, sources: documents.map(&:id) }
+    )
+
+    answer
+  end
+end
 ```
 
 ## Configuration Options
@@ -465,9 +852,9 @@ Langfuse (global module)
 
 ## Roadmap
 
-See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the detailed roadmap.
+See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [TRACING_DESIGN.md](TRACING_DESIGN.md) for detailed roadmaps.
 
-**Completed:**
+**Prompt Management (Completed):**
 - ✅ Phase 0: Foundation & Project Setup
 - ✅ Phase 1: HTTP Client with Authentication
 - ✅ Phase 2: Text & Chat Prompt Clients
@@ -475,11 +862,18 @@ See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the detailed roadmap.
 - ✅ Phase 4: In-Memory Caching with TTL
 - ✅ Phase 5: Global Configuration & Singleton
 
+**Tracing & Observability (Completed):**
+- ✅ Phase T0: OpenTelemetry Setup
+- ✅ Phase T1: Langfuse Exporter (OTel → Langfuse Events)
+- ✅ Phase T2: Ruby API Wrapper (Block-based API)
+- ✅ Phase T4: Prompt Linking (Automatic)
+
 **Coming Soon:**
-- 🚧 Phase 6: Convenience Features (error recovery, helpers)
-- 🚧 Phase 7: Advanced Caching (LRU, background refresh)
+- 🚧 Phase T3: Async Processing (ActiveJob/Sidekiq)
+- 🚧 Phase T5: Cost Tracking (Automatic calculation)
+- 🚧 Phase T6: Distributed Tracing (W3C Trace Context)
+- 🚧 Phase T7: APM Integration (Multi-exporter)
 - 🚧 Phase 8: CRUD Operations (create/update prompts)
-- 🚧 Phase 9: LangChain Integration
 - 🚧 Phase 10: Documentation & 1.0 Release
 
 ## Contributing
@@ -512,4 +906,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Note**: This SDK is under active development. Prompt management features are production-ready, but LLM tracing and observability features are coming soon. Check [PROGRESS.md](PROGRESS.md) for current status.
+**Note**: This SDK includes production-ready prompt management and LLM tracing (built on OpenTelemetry). Advanced features like ingestion batching and APM export are under active development. Check [PROGRESS.md](PROGRESS.md) for current status.

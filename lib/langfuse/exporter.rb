@@ -199,14 +199,10 @@ module Langfuse
     # @param attributes [Hash]
     # @return [Hash, nil]
     def extract_usage(attributes)
-      return nil unless attributes["langfuse.usage.total_tokens"]
+      usage_json = attributes["langfuse.usage"]
+      return nil unless usage_json
 
-      {
-        prompt_tokens: attributes["langfuse.usage.prompt_tokens"]&.to_i,
-        completion_tokens: attributes["langfuse.usage.completion_tokens"]&.to_i,
-        total_tokens: attributes["langfuse.usage.total_tokens"]&.to_i,
-        total_cost: attributes["langfuse.usage.total_cost"]&.to_f
-      }.compact
+      parse_json_attribute(usage_json)
     end
 
     # Format OTel trace ID to hex string

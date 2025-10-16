@@ -158,5 +158,67 @@ RSpec.describe Langfuse::Exporter do
 
       expect(WebMock).to have_requested(:post, "#{base_url}/api/public/ingestion").once
     end
+
+    it "properly parses input, output, and usage for generation" do
+      input_data = { "messages" => [{ "role" => "user", "content" => "Hello" }] }
+      output_data = { "role" => "assistant", "content" => "Hi there!" }
+      usage_data = { "prompt_tokens" => 10, "completion_tokens" => 20, "total_tokens" => 30 }
+
+      span_data = create_span_with_attributes(
+        "langfuse.type" => "generation",
+        "langfuse.model" => "gpt-4",
+        "langfuse.input" => input_data.to_json,
+        "langfuse.output" => output_data.to_json,
+        "langfuse.usage" => usage_data.to_json
+      )
+
+      # Capture the request body
+      request_body = nil
+      stub_request(:post, "#{base_url}/api/public/ingestion")
+        .to_return do |request|
+          request_body = JSON.parse(request.body)
+          { status: 200, body: {}.to_json }
+        end
+
+      exporter.export([span_data])
+
+      # Verify the event was sent
+      expect(WebMock).to have_requested(:post, "#{base_url}/api/public/ingestion").once
+
+      # Verify the parsed data
+      event = request_body["batch"].first
+      expect(event["type"]).to eq("generation-create")
+      expect(event["body"]["input"]).to eq(input_data)
+      expect(event["body"]["output"]).to eq(output_data)
+      expect(event["body"]["usage"]).to eq(usage_data)
+      expect(event["body"]["model"]).to eq("gpt-4")
+    end
+
+    it "properly parses input and output for span" do
+      input_data = { "query" => "SELECT * FROM users" }
+      output_data = { "results" => [{ "id" => 1, "name" => "Alice" }], "count" => 1 }
+
+      span_data = create_span_with_attributes(
+        "langfuse.type" => "span",
+        "langfuse.input" => input_data.to_json,
+        "langfuse.output" => output_data.to_json
+      )
+
+      # Capture the request body
+      request_body = nil
+      stub_request(:post, "#{base_url}/api/public/ingestion")
+        .to_return do |request|
+          request_body = JSON.parse(request.body)
+          { status: 200, body: {}.to_json }
+        end
+
+      exporter.export([span_data])
+
+      # Verify the parsed data
+      event = request_body["batch"].first
+      expect(event["type"]).to eq("span-create")
+      expect(event["body"]["input"]).to eq(input_data)
+      expect(event["body"]["output"]).to eq(output_data)
+    end
   end
 end
