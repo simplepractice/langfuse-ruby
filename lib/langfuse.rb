@@ -29,8 +29,6 @@ end
 require_relative "langfuse/config"
 require_relative "langfuse/prompt_cache"
 require_relative "langfuse/api_client"
-require_relative "langfuse/ingestion_client"
-require_relative "langfuse/exporter"
 require_relative "langfuse/otel_setup"
 require_relative "langfuse/tracer"
 require_relative "langfuse/trace"

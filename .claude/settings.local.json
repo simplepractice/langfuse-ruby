@@ -9,7 +9,8 @@
       "Bash(mkdir:*)",
       "WebSearch",
       "Read(//Users/noah/dev/simplepractice/simplepractice/**)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:langfuse.com)"
     ],
     "deny": [],
     "ask": []

@@ -24,8 +24,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           span_data = trace.otel_span.to_span_data
         end
 
-        expect(span_data.attributes["langfuse.type"]).to eq("trace")
-        expect(span_data.attributes["langfuse.user_id"]).to eq("user-123")
+        expect(span_data.attributes["langfuse.user.id"]).to eq("user-123")
       end
 
       it "sets session_id attribute" do
@@ -34,17 +33,17 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           span_data = trace.otel_span.to_span_data
         end
 
-        expect(span_data.attributes["langfuse.session_id"]).to eq("session-456")
+        expect(span_data.attributes["langfuse.session.id"]).to eq("session-456")
       end
 
-      it "sets metadata as JSON" do
+      it "sets metadata as individual attributes" do
         span_data = nil
-        tracer.trace(name: "test-trace", metadata: { key: "value" }) do |trace|
+        tracer.trace(name: "test-trace", metadata: { key: "value", foo: "bar" }) do |trace|
           span_data = trace.otel_span.to_span_data
         end
 
-        metadata = JSON.parse(span_data.attributes["langfuse.metadata"])
-        expect(metadata).to eq({ "key" => "value" })
+        expect(span_data.attributes["langfuse.trace.metadata.key"]).to eq("value")
+        expect(span_data.attributes["langfuse.trace.metadata.foo"]).to eq("bar")
       end
 
       it "sets tags as JSON array" do
@@ -53,7 +52,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           span_data = trace.otel_span.to_span_data
         end
 
-        tags = JSON.parse(span_data.attributes["langfuse.tags"])
+        tags = JSON.parse(span_data.attributes["langfuse.trace.tags"])
         expect(tags).to eq(%w[production critical])
       end
     end
@@ -89,9 +88,9 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        expect(span_data.attributes["langfuse.type"]).to eq("span")
-        expect(JSON.parse(span_data.attributes["langfuse.input"])).to eq({ "query" => "SELECT ..." })
-        expect(JSON.parse(span_data.attributes["langfuse.metadata"])).to eq({ "db" => "postgres" })
+        expect(span_data.attributes["langfuse.observation.type"]).to eq("span")
+        expect(JSON.parse(span_data.attributes["langfuse.observation.input"])).to eq({ "query" => "SELECT ..." })
+        expect(span_data.attributes["langfuse.observation.metadata.db"]).to eq("postgres")
       end
     end
 
@@ -122,9 +121,9 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        expect(gen_data.attributes["langfuse.type"]).to eq("generation")
-        expect(gen_data.attributes["langfuse.model"]).to eq("gpt-4")
-        expect(JSON.parse(gen_data.attributes["langfuse.model_parameters"])).to eq({ "temperature" => 0.7 })
+        expect(gen_data.attributes["langfuse.observation.type"]).to eq("generation")
+        expect(gen_data.attributes["langfuse.observation.model.name"]).to eq("gpt-4")
+        expect(JSON.parse(gen_data.attributes["langfuse.observation.model.parameters"])).to eq({ "temperature" => 0.7 })
       end
 
       it "auto-links prompt with name and version" do
@@ -137,8 +136,8 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        expect(gen_data.attributes["langfuse.prompt_name"]).to eq("greeting-prompt")
-        expect(gen_data.attributes["langfuse.prompt_version"]).to eq("3")
+        expect(gen_data.attributes["langfuse.observation.prompt.name"]).to eq("greeting-prompt")
+        expect(gen_data.attributes["langfuse.observation.prompt.version"]).to eq(3)
       end
 
       it "does not link prompt without name and version" do
@@ -151,8 +150,8 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        expect(gen_data.attributes["langfuse.prompt_name"]).to be_nil
-        expect(gen_data.attributes["langfuse.prompt_version"]).to be_nil
+        expect(gen_data.attributes["langfuse.observation.prompt.name"]).to be_nil
+        expect(gen_data.attributes["langfuse.observation.prompt.version"]).to be_nil
       end
     end
 
@@ -166,7 +165,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
 
         expect(events.length).to eq(1)
         expect(events.first.name).to eq("user-feedback")
-        expect(JSON.parse(events.first.attributes["langfuse.input"])).to eq({ "rating" => "thumbs_up" })
+        expect(JSON.parse(events.first.attributes["langfuse.observation.input"])).to eq({ "rating" => "thumbs_up" })
       end
     end
 
@@ -213,13 +212,13 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        output = JSON.parse(span_data.attributes["langfuse.output"])
+        output = JSON.parse(span_data.attributes["langfuse.observation.output"])
         expect(output).to eq({ "results" => [1, 2, 3], "count" => 3 })
       end
     end
 
     describe "#metadata=" do
-      it "sets metadata attribute" do
+      it "sets metadata as individual attributes" do
         span_data = nil
         tracer.trace(name: "parent-trace") do |trace|
           trace.span(name: "child-span") do |span|
@@ -228,8 +227,8 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        metadata = JSON.parse(span_data.attributes["langfuse.metadata"])
-        expect(metadata).to eq({ "cache" => "hit", "latency_ms" => 42 })
+        expect(span_data.attributes["langfuse.observation.metadata.cache"]).to eq("hit")
+        expect(span_data.attributes["langfuse.observation.metadata.latency_ms"]).to eq("42")
       end
     end
 
@@ -243,7 +242,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        expect(span_data.attributes["langfuse.level"]).to eq("warning")
+        expect(span_data.attributes["langfuse.observation.level"]).to eq("warning")
       end
     end
 
@@ -274,7 +273,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        output = JSON.parse(gen_data.attributes["langfuse.output"])
+        output = JSON.parse(gen_data.attributes["langfuse.observation.output"])
         expect(output).to eq("Hello, how can I help you?")
       end
     end
@@ -289,7 +288,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        usage = JSON.parse(gen_data.attributes["langfuse.usage"])
+        usage = JSON.parse(gen_data.attributes["langfuse.observation.usage_details"])
         expect(usage).to eq({
                               "prompt_tokens" => 100,
                               "completion_tokens" => 50,
@@ -299,7 +298,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
     end
 
     describe "#metadata=" do
-      it "sets metadata attribute" do
+      it "sets metadata as individual attributes" do
         gen_data = nil
         tracer.trace(name: "parent-trace") do |trace|
           trace.generation(name: "gpt4-call", model: "gpt-4") do |gen|
@@ -308,8 +307,8 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        metadata = JSON.parse(gen_data.attributes["langfuse.metadata"])
-        expect(metadata).to eq({ "finish_reason" => "stop", "model_version" => "gpt-4-0613" })
+        expect(gen_data.attributes["langfuse.observation.metadata.finish_reason"]).to eq("stop")
+        expect(gen_data.attributes["langfuse.observation.metadata.model_version"]).to eq("gpt-4-0613")
       end
     end
 
@@ -323,7 +322,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           end
         end
 
-        expect(gen_data.attributes["langfuse.level"]).to eq("error")
+        expect(gen_data.attributes["langfuse.observation.level"]).to eq("error")
       end
     end
 

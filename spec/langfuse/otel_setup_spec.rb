@@ -23,9 +23,9 @@ RSpec.describe Langfuse::OtelSetup do
     # Reset OTel setup before each test
     described_class.shutdown(timeout: 1) if described_class.initialized?
 
-    # Stub HTTP requests
-    stub_request(:post, "#{base_url}/api/public/ingestion")
-      .to_return(status: 200, body: {}.to_json)
+    # Stub OTLP endpoint
+    stub_request(:post, "#{base_url}/api/public/otel/v1/traces")
+      .to_return(status: 200, body: "", headers: {})
   end
 
   after do
@@ -227,8 +227,8 @@ RSpec.describe Langfuse::OtelSetup do
       # Force flush to send immediately
       Langfuse.force_flush(timeout: 1)
 
-      # Verify HTTP request was made (with BatchSpanProcessor, trace + span sent in 1 batch)
-      expect(WebMock).to have_requested(:post, "#{base_url}/api/public/ingestion").once
+      # Verify OTLP endpoint was called
+      expect(WebMock).to have_requested(:post, "#{base_url}/api/public/otel/v1/traces").at_least_once
     end
   end
 end

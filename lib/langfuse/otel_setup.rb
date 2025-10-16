@@ -1,18 +1,20 @@
 # frozen_string_literal: true
 
 require "opentelemetry/sdk"
+require "opentelemetry/exporter/otlp"
+require "base64"
 
 module Langfuse
   # OpenTelemetry initialization and setup
   #
-  # Handles configuration of the OTel SDK with Langfuse exporter
+  # Handles configuration of the OTel SDK with Langfuse OTLP exporter
   # when tracing is enabled.
   #
   module OtelSetup
     class << self
       attr_reader :tracer_provider
 
-      # Initialize OpenTelemetry with Langfuse exporter
+      # Initialize OpenTelemetry with Langfuse OTLP exporter
       #
       # @param config [Langfuse::Config] The Langfuse configuration
       # @return [void]
@@ -20,12 +22,11 @@ module Langfuse
       def setup(config)
         return unless config.tracing_enabled
 
-        # Create Langfuse exporter
-        exporter = Langfuse::Exporter.new(
-          public_key: config.public_key,
-          secret_key: config.secret_key,
-          base_url: config.base_url,
-          logger: config.logger
+        # Create OTLP exporter configured for Langfuse
+        exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
+          endpoint: "#{config.base_url}/api/public/otel/v1/traces",
+          headers: build_headers(config.public_key, config.secret_key),
+          compression: "gzip"
         )
 
         # Create processor based on async configuration
@@ -89,6 +90,21 @@ module Langfuse
       # @return [Boolean]
       def initialized?
         !@tracer_provider.nil?
+      end
+
+      private
+
+      # Build HTTP headers for Langfuse OTLP endpoint
+      #
+      # @param public_key [String] Langfuse public API key
+      # @param secret_key [String] Langfuse secret API key
+      # @return [Hash] HTTP headers with Basic Auth
+      def build_headers(public_key, secret_key)
+        credentials = "#{public_key}:#{secret_key}"
+        encoded = Base64.strict_encode64(credentials)
+        {
+          "Authorization" => "Basic #{encoded}"
+        }
       end
     end
   end

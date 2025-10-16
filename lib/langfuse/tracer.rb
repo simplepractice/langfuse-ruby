@@ -86,15 +86,20 @@ module Langfuse
     # @param tags [Array<String>, nil]
     # @return [Hash]
     def build_trace_attributes(user_id:, session_id:, input:, output:, metadata:, tags:)
-      {
-        "langfuse.type" => "trace",
-        "langfuse.user_id" => user_id,
-        "langfuse.session_id" => session_id,
-        "langfuse.input" => input&.to_json,
-        "langfuse.output" => output&.to_json,
-        "langfuse.metadata" => metadata&.to_json,
-        "langfuse.tags" => tags&.to_json
+      attrs = {
+        "langfuse.user.id" => user_id,
+        "langfuse.session.id" => session_id,
+        "langfuse.trace.input" => input&.to_json,
+        "langfuse.trace.output" => output&.to_json,
+        "langfuse.trace.tags" => tags&.to_json
       }.compact
+
+      # Add metadata as individual langfuse.trace.metadata.* attributes
+      metadata&.each do |key, value|
+        attrs["langfuse.trace.metadata.#{key}"] = value.to_s
+      end
+
+      attrs
     end
 
     # Wrap the user's block to inject a Trace object

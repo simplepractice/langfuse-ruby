@@ -103,8 +103,8 @@ module Langfuse
     #
     def event(name:, input: nil, level: "default")
       attributes = {
-        "langfuse.input" => input&.to_json,
-        "langfuse.level" => level
+        "langfuse.observation.input" => input&.to_json,
+        "langfuse.observation.level" => level
       }.compact
 
       @otel_span.add_event(name, attributes: attributes)
@@ -119,19 +119,21 @@ module Langfuse
     #   span.output = { results: [...], count: 42 }
     #
     def output=(value)
-      @otel_span.set_attribute("langfuse.output", value.to_json)
+      @otel_span.set_attribute("langfuse.observation.output", value.to_json)
     end
 
     # Set metadata for this span
     #
-    # @param value [Hash] Metadata hash (will be JSON-encoded)
+    # @param value [Hash] Metadata hash (expanded into individual langfuse.observation.metadata.* attributes)
     # @return [void]
     #
     # @example
     #   span.metadata = { source: "database", cache: "miss" }
     #
     def metadata=(value)
-      @otel_span.set_attribute("langfuse.metadata", value.to_json)
+      value.each do |key, val|
+        @otel_span.set_attribute("langfuse.observation.metadata.#{key}", val.to_s)
+      end
     end
 
     # Set the level of this span
@@ -143,7 +145,7 @@ module Langfuse
     #   span.level = "warning"
     #
     def level=(value)
-      @otel_span.set_attribute("langfuse.level", value)
+      @otel_span.set_attribute("langfuse.observation.level", value)
     end
 
     # Access the underlying OTel span (for advanced users)
@@ -163,12 +165,18 @@ module Langfuse
     # @param level [String]
     # @return [Hash]
     def build_span_attributes(type:, input:, metadata:, level:)
-      {
-        "langfuse.type" => type,
-        "langfuse.input" => input&.to_json,
-        "langfuse.metadata" => metadata&.to_json,
-        "langfuse.level" => level
+      attrs = {
+        "langfuse.observation.type" => type,
+        "langfuse.observation.input" => input&.to_json,
+        "langfuse.observation.level" => level
       }.compact
+
+      # Add metadata as individual langfuse.observation.metadata.* attributes
+      metadata&.each do |key, value|
+        attrs["langfuse.observation.metadata.#{key}"] = value.to_s
+      end
+
+      attrs
     end
 
     # Build OTel attributes for a generation
@@ -181,17 +189,21 @@ module Langfuse
     # @return [Hash]
     def build_generation_attributes(model:, input:, metadata:, model_parameters:, prompt:)
       attrs = {
-        "langfuse.type" => "generation",
-        "langfuse.model" => model,
-        "langfuse.input" => input&.to_json,
-        "langfuse.metadata" => metadata&.to_json,
-        "langfuse.model_parameters" => model_parameters&.to_json
+        "langfuse.observation.type" => "generation",
+        "langfuse.observation.model.name" => model,
+        "langfuse.observation.input" => input&.to_json,
+        "langfuse.observation.model.parameters" => model_parameters&.to_json
       }.compact
+
+      # Add metadata as individual langfuse.observation.metadata.* attributes
+      metadata&.each do |key, value|
+        attrs["langfuse.observation.metadata.#{key}"] = value.to_s
+      end
 
       # Auto-link prompt if provided
       if prompt.respond_to?(:name) && prompt.respond_to?(:version)
-        attrs["langfuse.prompt_name"] = prompt.name
-        attrs["langfuse.prompt_version"] = prompt.version.to_s
+        attrs["langfuse.observation.prompt.name"] = prompt.name
+        attrs["langfuse.observation.prompt.version"] = prompt.version.to_i
       end
 
       attrs

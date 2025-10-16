@@ -38,7 +38,7 @@ module Langfuse
     #   gen.output = { role: "assistant", content: "Hello!" }
     #
     def output=(value)
-      @otel_span.set_attribute("langfuse.output", value.to_json)
+      @otel_span.set_attribute("langfuse.observation.output", value.to_json)
     end
 
     # Set the usage statistics for this generation
@@ -57,19 +57,21 @@ module Langfuse
     #   }
     #
     def usage=(value)
-      @otel_span.set_attribute("langfuse.usage", value.to_json)
+      @otel_span.set_attribute("langfuse.observation.usage_details", value.to_json)
     end
 
     # Set metadata for this generation
     #
-    # @param value [Hash] Metadata hash (will be JSON-encoded)
+    # @param value [Hash] Metadata hash (expanded into individual langfuse.observation.metadata.* attributes)
     # @return [void]
     #
     # @example
     #   gen.metadata = { finish_reason: "stop", model_version: "gpt-4-0613" }
     #
     def metadata=(value)
-      @otel_span.set_attribute("langfuse.metadata", value.to_json)
+      value.each do |key, val|
+        @otel_span.set_attribute("langfuse.observation.metadata.#{key}", val.to_s)
+      end
     end
 
     # Set the level of this generation
@@ -81,7 +83,7 @@ module Langfuse
     #   gen.level = "warning" if response.finish_reason == "length"
     #
     def level=(value)
-      @otel_span.set_attribute("langfuse.level", value)
+      @otel_span.set_attribute("langfuse.observation.level", value)
     end
 
     # Add an event to the generation
@@ -97,8 +99,8 @@ module Langfuse
     #
     def event(name:, input: nil, level: "default")
       attributes = {
-        "langfuse.input" => input&.to_json,
-        "langfuse.level" => level
+        "langfuse.observation.input" => input&.to_json,
+        "langfuse.observation.level" => level
       }.compact
 
       @otel_span.add_event(name, attributes: attributes)

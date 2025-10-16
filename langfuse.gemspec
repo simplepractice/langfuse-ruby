@@ -37,6 +37,7 @@ Gem::Specification.new do |spec|
   # Runtime dependencies - OpenTelemetry (for tracing)
   spec.add_dependency "opentelemetry-api", "~> 1.2"
   spec.add_dependency "opentelemetry-common", "~> 0.21"
+  spec.add_dependency "opentelemetry-exporter-otlp", "~> 0.28"
   spec.add_dependency "opentelemetry-sdk", "~> 1.4"
 
   # Development dependencies are specified in Gemfile
