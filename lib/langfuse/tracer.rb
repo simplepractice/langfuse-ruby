@@ -45,6 +45,7 @@ module Langfuse
     #     end
     #   end
     #
+    # rubocop:disable Metrics/ParameterLists
     def trace(name:, user_id: nil, session_id: nil, input: nil, output: nil, metadata: nil, tags: nil, context: nil,
               &block)
       attributes = build_trace_attributes(
@@ -64,6 +65,7 @@ module Langfuse
         @otel_tracer.in_span(name, attributes: attributes, &wrap_trace_block(block))
       end
     end
+    # rubocop:enable Metrics/ParameterLists
 
     private
 

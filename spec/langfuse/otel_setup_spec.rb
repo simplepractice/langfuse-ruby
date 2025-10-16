@@ -227,8 +227,8 @@ RSpec.describe Langfuse::OtelSetup do
       # Force flush to send immediately
       Langfuse.force_flush(timeout: 1)
 
-      # Verify HTTP requests were made (trace + span = 2 requests)
-      expect(WebMock).to have_requested(:post, "#{base_url}/api/public/ingestion").twice
+      # Verify HTTP request was made (with BatchSpanProcessor, trace + span sent in 1 batch)
+      expect(WebMock).to have_requested(:post, "#{base_url}/api/public/ingestion").once
     end
   end
 end

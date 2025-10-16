@@ -33,6 +33,7 @@ RSpec.describe "End-to-End Langfuse Integration" do
   end
 
   describe "Trace with Generation" do
+    # rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
     it "sends correct payload to Langfuse API" do
       # Simulate the spam-detection script
       Langfuse.trace(name: "spam-detection", user_id: "test-user") do |trace|
@@ -61,14 +62,6 @@ RSpec.describe "End-to-End Langfuse Integration" do
       # Verify request was made
       expect(WebMock).to have_requested(:post, "#{base_url}/api/public/ingestion").at_least_once
 
-      # Debug: Print the captured payloads
-      puts "\n=== Captured Request Bodies ==="
-      captured_request_body.each_with_index do |body, idx|
-        puts "\n--- Request #{idx + 1} ---"
-        puts JSON.pretty_generate(body)
-      end
-      puts "=== End Captured Bodies ===\n"
-
       # Verify the payloads
       all_events = captured_request_body.flat_map { |req| req["batch"] }
 
@@ -90,9 +83,6 @@ RSpec.describe "End-to-End Langfuse Integration" do
       expect(generation_event["body"]["model"]).to eq("gpt-4")
 
       # THIS IS THE KEY TEST: Check if input/output are present and parsed correctly
-      puts "\n=== Generation Event Body ==="
-      puts JSON.pretty_generate(generation_event["body"])
-
       # Input should be the messages array (parsed from JSON)
       expect(generation_event["body"]["input"]).to eq([
                                                         { "role" => "system", "content" => "You are a spam detector" },
@@ -109,6 +99,7 @@ RSpec.describe "End-to-End Langfuse Integration" do
                                                         "total_tokens" => 52
                                                       })
     end
+    # rubocop:enable RSpec/ExampleLength, RSpec/MultipleExpectations
 
     it "supports trace input/output via parameters" do
       # Test traces with input/output passed as parameters
@@ -163,6 +154,7 @@ RSpec.describe "End-to-End Langfuse Integration" do
   end
 
   describe "Nested Spans (Parent-Child Relationships)" do
+    # rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
     it "correctly establishes parent-child relationships per OTel spec" do
       # Test multi-level nesting:
       # - Trace (root)
@@ -243,23 +235,17 @@ RSpec.describe "End-to-End Langfuse Integration" do
       expect(span1_event["body"]).not_to have_key("parent_observation_id"),
                                          "span-1 (direct child of trace) should not have parent_observation_id"
       expect(gen_direct_event["body"]).not_to have_key("parent_observation_id"),
-                                               "gen-direct (direct child of trace) should not have parent_observation_id"
+                                              "gen-direct (direct child of trace) should not have parent_observation_id"
 
       # 3. span-2 should have parent_observation_id = span-1's ID
       expect(span2_event["body"]["parent_observation_id"]).to eq(span1_id),
-                                                                  "span-2 should have parent_observation_id = span-1's ID"
+                                                              "span-2 should have parent_observation_id = span-1's ID"
 
       # 4. gen-nested should have parent_observation_id = span-2's ID
       expect(gen_nested_event["body"]["parent_observation_id"]).to eq(span2_id),
-                                                                       "gen-nested should have parent_observation_id = span-2's ID"
-
-      puts "\n=== Parent-Child Relationship Test Passed ==="
-      puts "Trace ID: #{trace_id}"
-      puts "Span 1 ID: #{span1_id} (parent: nil - direct child of trace)"
-      puts "Span 2 ID: #{span2_id} (parent: #{span2_event['body']['parent_observation_id']})"
-      puts "Gen Nested ID: #{gen_nested_event['body']['id']} (parent: #{gen_nested_event['body']['parent_observation_id']})"
-      puts "Gen Direct ID: #{gen_direct_event['body']['id']} (parent: nil - direct child of trace)"
+                                                                   "gen-nested should have parent = span-2 ID"
     end
+    # rubocop:enable RSpec/ExampleLength, RSpec/MultipleExpectations
 
     it "handles multiple parallel branches correctly" do
       # Test parallel branches:

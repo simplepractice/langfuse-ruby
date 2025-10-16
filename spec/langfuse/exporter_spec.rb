@@ -159,6 +159,7 @@ RSpec.describe Langfuse::Exporter do
       expect(WebMock).to have_requested(:post, "#{base_url}/api/public/ingestion").once
     end
 
+    # rubocop:disable RSpec/MultipleExpectations
     it "properly parses input, output, and usage for generation" do
       input_data = { "messages" => [{ "role" => "user", "content" => "Hello" }] }
       output_data = { "role" => "assistant", "content" => "Hi there!" }
@@ -193,6 +194,7 @@ RSpec.describe Langfuse::Exporter do
       expect(event["body"]["usage"]).to eq(usage_data)
       expect(event["body"]["model"]).to eq("gpt-4")
     end
+    # rubocop:enable RSpec/MultipleExpectations
 
     it "properly parses input and output for span" do
       input_data = { "query" => "SELECT * FROM users" }

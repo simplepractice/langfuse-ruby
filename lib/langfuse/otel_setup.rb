@@ -16,6 +16,7 @@ module Langfuse
       #
       # @param config [Langfuse::Config] The Langfuse configuration
       # @return [void]
+      # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       def setup(config)
         return unless config.tracing_enabled
 
@@ -28,6 +29,8 @@ module Langfuse
         )
 
         # Create processor based on async configuration
+        # IMPORTANT: Always use BatchSpanProcessor (even in sync mode) to ensure spans
+        # are exported together, which allows proper parent-child relationship detection
         processor = if config.tracing_async
                       # Async: BatchSpanProcessor batches and sends in background
                       OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
@@ -37,8 +40,15 @@ module Langfuse
                         max_export_batch_size: config.batch_size
                       )
                     else
-                      # Sync: SimpleSpanProcessor sends immediately (blocking)
-                      OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
+                      # Sync: BatchSpanProcessor with minimal delay (flushes on force_flush)
+                      # This collects spans from the same trace and exports them together,
+                      # which is critical for correct parent_observation_id calculation
+                      OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
+                        exporter,
+                        max_queue_size: config.batch_size * 2,
+                        schedule_delay: 60_000, # 60 seconds (relies on explicit force_flush)
+                        max_export_batch_size: config.batch_size
+                      )
                     end
 
         # Create TracerProvider with processor
@@ -51,6 +61,7 @@ module Langfuse
         mode = config.tracing_async ? "async" : "sync"
         config.logger.info("Langfuse tracing initialized with OpenTelemetry (#{mode} mode)")
       end
+      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
       # Shutdown the tracer provider and flush any pending spans
       #

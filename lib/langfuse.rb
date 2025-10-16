@@ -110,6 +110,7 @@ module Langfuse
     #     end
     #   end
     #
+    # rubocop:disable Metrics/ParameterLists
     def trace(name:, user_id: nil, session_id: nil, input: nil, output: nil, metadata: nil, tags: nil, context: nil, &)
       tracer.trace(
         name: name,
@@ -123,6 +124,7 @@ module Langfuse
         &
       )
     end
+    # rubocop:enable Metrics/ParameterLists
 
     # Shutdown Langfuse and flush any pending traces
     #

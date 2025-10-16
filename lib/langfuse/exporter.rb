@@ -3,7 +3,6 @@
 require "opentelemetry/sdk"
 require "securerandom"
 require "json"
-require "set"
 
 module Langfuse
   # OpenTelemetry exporter that converts OTel spans to Langfuse events
@@ -23,6 +22,7 @@ module Langfuse
   #     )
   #   end
   #
+  # rubocop:disable Metrics/ClassLength
   class Exporter
     attr_reader :ingestion_client
 
@@ -40,6 +40,9 @@ module Langfuse
         logger: logger
       )
       @logger = logger || Logger.new($stdout)
+      # Cache of span_id -> langfuse.type to handle SimpleSpanProcessor exporting spans one-at-a-time
+      # When a child span is exported before its parent, we can look up the parent's type from this cache
+      @span_types_cache = {}
     end
 
     # Export spans to Langfuse (called by OTel BatchSpanProcessor)
@@ -50,10 +53,28 @@ module Langfuse
     def export(span_data_list, timeout: nil)
       return OpenTelemetry::SDK::Trace::Export::SUCCESS if span_data_list.nil? || span_data_list.empty?
 
-      # First pass: identify which span IDs are traces (root spans)
-      trace_span_ids = identify_trace_span_ids(span_data_list)
+      @logger.debug("=" * 80)
+      @logger.debug("Langfuse Exporter: Exporting #{span_data_list.length} spans")
 
-      events = span_data_list.map { |span_data| convert_span_to_event(span_data, trace_span_ids) }.compact
+      # First pass: build a map of span_id -> langfuse.type for all spans in this export
+      # and merge with the persistent cache
+      current_batch_types = build_span_types_map(span_data_list)
+      @span_types_cache.merge!(current_batch_types)
+      @logger.debug("Span types (current batch): #{current_batch_types}")
+      @logger.debug("Span types (cached): #{@span_types_cache}")
+
+      events = span_data_list.map do |span_data|
+        event = convert_span_to_event(span_data, @span_types_cache)
+        if event
+          @logger.debug("Created event: type=#{event[:type]}, body.id=#{event[:body][:id]}, " \
+                        "body.trace_id=#{event[:body][:trace_id]}, " \
+                        "body.parent_observation_id=#{event[:body][:parent_observation_id]}")
+        end
+        event
+      end.compact
+
+      @logger.debug("Sending batch with #{events.length} events")
+      @logger.debug("Full batch payload: #{JSON.pretty_generate(events)}")
 
       @ingestion_client.send_batch(events)
 
@@ -84,27 +105,35 @@ module Langfuse
 
     private
 
-    # Identify which span IDs correspond to traces (root spans with type=trace)
+    # Build a map of span_id -> langfuse.type for all spans in this export batch
+    #
+    # This allows us to determine if a parent span is a trace when processing child spans,
+    # even when spans are exported one-at-a-time (SimpleSpanProcessor) or in separate batches.
     #
     # @param span_data_list [Array<OpenTelemetry::SDK::Trace::SpanData>]
-    # @return [Set<String>] Set of hex-encoded span IDs that are traces
-    def identify_trace_span_ids(span_data_list)
-      trace_span_ids = Set.new
+    # @return [Hash<String, String>] Map of hex-encoded span IDs to their langfuse.type
+    def build_span_types_map(span_data_list)
+      span_types = {}
       span_data_list.each do |span_data|
         attributes = extract_attributes(span_data)
-        if attributes["langfuse.type"] == "trace"
-          trace_span_ids.add(format_span_id(span_data.span_id))
-        end
+        span_id_hex = format_span_id(span_data.span_id)
+        langfuse_type = attributes["langfuse.type"] || "span"
+
+        @logger.debug("  Span: name=#{span_data.name}, id=#{span_id_hex}, " \
+                      "langfuse.type=#{langfuse_type}, " \
+                      "parent_span_id=#{format_span_id(span_data.parent_span_id)}")
+
+        span_types[span_id_hex] = langfuse_type if span_id_hex
       end
-      trace_span_ids
+      span_types
     end
 
     # Convert an OTel span to a Langfuse ingestion event
     #
     # @param span_data [OpenTelemetry::SDK::Trace::SpanData] The span data
-    # @param trace_span_ids [Set<String>] Set of span IDs that are traces
+    # @param span_types [Hash<String, String>] Map of span IDs to their langfuse.type
     # @return [Hash, nil] The Langfuse event or nil if conversion fails
-    def convert_span_to_event(span_data, trace_span_ids)
+    def convert_span_to_event(span_data, span_types)
       attributes = extract_attributes(span_data)
       langfuse_type = attributes["langfuse.type"] || "span"
 
@@ -112,12 +141,12 @@ module Langfuse
       when "trace"
         create_trace_event(span_data, attributes)
       when "span"
-        create_span_event(span_data, attributes, trace_span_ids)
+        create_span_event(span_data, attributes, span_types)
       when "generation"
-        create_generation_event(span_data, attributes, trace_span_ids)
+        create_generation_event(span_data, attributes, span_types)
       else
         @logger.warn("Unknown langfuse.type: #{langfuse_type}, treating as span")
-        create_span_event(span_data, attributes, trace_span_ids)
+        create_span_event(span_data, attributes, span_types)
       end
     rescue StandardError => e
       @logger.error("Failed to convert span to event: #{e.message}")
@@ -163,14 +192,20 @@ module Langfuse
     #
     # @param span_data [OpenTelemetry::SDK::Trace::SpanData]
     # @param attributes [Hash]
-    # @param trace_span_ids [Set<String>] Set of span IDs that are traces
+    # @param span_types [Hash<String, String>] Map of span IDs to their langfuse.type
     # @return [Hash]
-    def create_span_event(span_data, attributes, trace_span_ids)
+    def create_span_event(span_data, attributes, span_types)
       # Don't set parent_observation_id if parent is a trace (direct child of trace)
       parent_span_id_hex = format_span_id(span_data.parent_span_id)
-      parent_observation_id = if parent_span_id_hex && trace_span_ids.include?(parent_span_id_hex)
+      parent_type = span_types[parent_span_id_hex]
+
+      parent_observation_id = if parent_span_id_hex && parent_type == "trace"
+                                @logger.debug("    Parent type=#{parent_type} (#{parent_span_id_hex}) -> " \
+                                              "parent_observation_id = nil")
                                 nil
                               else
+                                @logger.debug("    Parent type=#{parent_type} (#{parent_span_id_hex}) -> " \
+                                              "parent_observation_id = #{parent_span_id_hex}")
                                 parent_span_id_hex
                               end
 
@@ -198,14 +233,20 @@ module Langfuse
     #
     # @param span_data [OpenTelemetry::SDK::Trace::SpanData]
     # @param attributes [Hash]
-    # @param trace_span_ids [Set<String>] Set of span IDs that are traces
+    # @param span_types [Hash<String, String>] Map of span IDs to their langfuse.type
     # @return [Hash]
-    def create_generation_event(span_data, attributes, trace_span_ids)
+    def create_generation_event(span_data, attributes, span_types)
       # Don't set parent_observation_id if parent is a trace (direct child of trace)
       parent_span_id_hex = format_span_id(span_data.parent_span_id)
-      parent_observation_id = if parent_span_id_hex && trace_span_ids.include?(parent_span_id_hex)
+      parent_type = span_types[parent_span_id_hex]
+
+      parent_observation_id = if parent_span_id_hex && parent_type == "trace"
+                                @logger.debug("    Parent type=#{parent_type} (#{parent_span_id_hex}) -> " \
+                                              "parent_observation_id = nil")
                                 nil
                               else
+                                @logger.debug("    Parent type=#{parent_type} (#{parent_span_id_hex}) -> " \
+                                              "parent_observation_id = #{parent_span_id_hex}")
                                 parent_span_id_hex
                               end
 
@@ -290,4 +331,5 @@ module Langfuse
       nil
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end
