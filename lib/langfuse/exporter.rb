@@ -3,6 +3,7 @@
 require "opentelemetry/sdk"
 require "securerandom"
 require "json"
+require "set"
 
 module Langfuse
   # OpenTelemetry exporter that converts OTel spans to Langfuse events
@@ -49,7 +50,10 @@ module Langfuse
     def export(span_data_list, timeout: nil)
       return OpenTelemetry::SDK::Trace::Export::SUCCESS if span_data_list.nil? || span_data_list.empty?
 
-      events = span_data_list.map { |span_data| convert_span_to_event(span_data) }.compact
+      # First pass: identify which span IDs are traces (root spans)
+      trace_span_ids = identify_trace_span_ids(span_data_list)
+
+      events = span_data_list.map { |span_data| convert_span_to_event(span_data, trace_span_ids) }.compact
 
       @ingestion_client.send_batch(events)
 
@@ -80,11 +84,27 @@ module Langfuse
 
     private
 
+    # Identify which span IDs correspond to traces (root spans with type=trace)
+    #
+    # @param span_data_list [Array<OpenTelemetry::SDK::Trace::SpanData>]
+    # @return [Set<String>] Set of hex-encoded span IDs that are traces
+    def identify_trace_span_ids(span_data_list)
+      trace_span_ids = Set.new
+      span_data_list.each do |span_data|
+        attributes = extract_attributes(span_data)
+        if attributes["langfuse.type"] == "trace"
+          trace_span_ids.add(format_span_id(span_data.span_id))
+        end
+      end
+      trace_span_ids
+    end
+
     # Convert an OTel span to a Langfuse ingestion event
     #
     # @param span_data [OpenTelemetry::SDK::Trace::SpanData] The span data
+    # @param trace_span_ids [Set<String>] Set of span IDs that are traces
     # @return [Hash, nil] The Langfuse event or nil if conversion fails
-    def convert_span_to_event(span_data)
+    def convert_span_to_event(span_data, trace_span_ids)
       attributes = extract_attributes(span_data)
       langfuse_type = attributes["langfuse.type"] || "span"
 
@@ -92,12 +112,12 @@ module Langfuse
       when "trace"
         create_trace_event(span_data, attributes)
       when "span"
-        create_span_event(span_data, attributes)
+        create_span_event(span_data, attributes, trace_span_ids)
       when "generation"
-        create_generation_event(span_data, attributes)
+        create_generation_event(span_data, attributes, trace_span_ids)
       else
         @logger.warn("Unknown langfuse.type: #{langfuse_type}, treating as span")
-        create_span_event(span_data, attributes)
+        create_span_event(span_data, attributes, trace_span_ids)
       end
     rescue StandardError => e
       @logger.error("Failed to convert span to event: #{e.message}")
@@ -143,8 +163,17 @@ module Langfuse
     #
     # @param span_data [OpenTelemetry::SDK::Trace::SpanData]
     # @param attributes [Hash]
+    # @param trace_span_ids [Set<String>] Set of span IDs that are traces
     # @return [Hash]
-    def create_span_event(span_data, attributes)
+    def create_span_event(span_data, attributes, trace_span_ids)
+      # Don't set parent_observation_id if parent is a trace (direct child of trace)
+      parent_span_id_hex = format_span_id(span_data.parent_span_id)
+      parent_observation_id = if parent_span_id_hex && trace_span_ids.include?(parent_span_id_hex)
+                                nil
+                              else
+                                parent_span_id_hex
+                              end
+
       {
         id: SecureRandom.uuid,
         timestamp: format_timestamp(span_data.start_timestamp),
@@ -152,7 +181,7 @@ module Langfuse
         body: {
           id: format_span_id(span_data.span_id),
           trace_id: format_trace_id(span_data.trace_id),
-          parent_observation_id: format_span_id(span_data.parent_span_id),
+          parent_observation_id: parent_observation_id,
           name: span_data.name,
           input: parse_json_attribute(attributes["langfuse.input"]),
           output: parse_json_attribute(attributes["langfuse.output"]),
@@ -169,8 +198,17 @@ module Langfuse
     #
     # @param span_data [OpenTelemetry::SDK::Trace::SpanData]
     # @param attributes [Hash]
+    # @param trace_span_ids [Set<String>] Set of span IDs that are traces
     # @return [Hash]
-    def create_generation_event(span_data, attributes)
+    def create_generation_event(span_data, attributes, trace_span_ids)
+      # Don't set parent_observation_id if parent is a trace (direct child of trace)
+      parent_span_id_hex = format_span_id(span_data.parent_span_id)
+      parent_observation_id = if parent_span_id_hex && trace_span_ids.include?(parent_span_id_hex)
+                                nil
+                              else
+                                parent_span_id_hex
+                              end
+
       {
         id: SecureRandom.uuid,
         timestamp: format_timestamp(span_data.start_timestamp),
@@ -178,7 +216,7 @@ module Langfuse
         body: {
           id: format_span_id(span_data.span_id),
           trace_id: format_trace_id(span_data.trace_id),
-          parent_observation_id: format_span_id(span_data.parent_span_id),
+          parent_observation_id: parent_observation_id,
           name: span_data.name,
           model: attributes["langfuse.model"],
           input: parse_json_attribute(attributes["langfuse.input"]),
