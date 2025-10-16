@@ -74,6 +74,72 @@ RSpec.describe Langfuse::Client do
         expect(client.api_client.cache).to be_nil
       end
     end
+
+    context "with Rails.cache backend" do
+      let(:config_with_rails_cache) do
+        Langfuse::Config.new do |config|
+          config.public_key = "pk_test_123"
+          config.secret_key = "sk_test_456"
+          config.base_url = "https://cloud.langfuse.com"
+          config.cache_ttl = 120
+          config.cache_backend = :rails
+        end
+      end
+
+      let(:mock_rails_cache) { double("Rails.cache") }
+
+      before do
+        # Stub Rails constant and cache
+        rails_class = Class.new do
+          def self.cache
+            @cache ||= nil
+          end
+
+          def self.cache=(value)
+            @cache = value
+          end
+        end
+
+        stub_const("Rails", rails_class)
+        Rails.cache = mock_rails_cache
+      end
+
+      it "creates api_client with RailsCacheAdapter" do
+        client = described_class.new(config_with_rails_cache)
+        expect(client.api_client.cache).to be_a(Langfuse::RailsCacheAdapter)
+      end
+
+      it "configures Rails cache adapter with correct TTL" do
+        client = described_class.new(config_with_rails_cache)
+        expect(client.api_client.cache.ttl).to eq(120)
+      end
+
+      it "ignores cache_max_size for Rails backend" do
+        # Rails.cache doesn't use max_size, so it should create adapter without error
+        config_with_rails_cache.cache_max_size = 500
+        expect do
+          described_class.new(config_with_rails_cache)
+        end.not_to raise_error
+      end
+    end
+
+    context "with invalid cache backend" do
+      let(:config_invalid_backend) do
+        Langfuse::Config.new do |config|
+          config.public_key = "pk_test_123"
+          config.secret_key = "sk_test_456"
+          config.base_url = "https://cloud.langfuse.com"
+          config.cache_ttl = 60
+          config.cache_backend = :invalid
+        end
+      end
+
+      it "raises ConfigurationError during validation" do
+        expect do
+          described_class.new(config_invalid_backend)
+        end.to raise_error(Langfuse::ConfigurationError, /cache_backend must be one of/)
+      end
+    end
   end
 
   describe "#get_prompt" do

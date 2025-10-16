@@ -127,12 +127,22 @@ module Langfuse
 
     # Create a cache instance based on configuration
     #
-    # @return [PromptCache]
+    # @return [PromptCache, RailsCacheAdapter]
     def create_cache
-      PromptCache.new(
-        ttl: config.cache_ttl,
-        max_size: config.cache_max_size
-      )
+      case config.cache_backend
+      when :memory
+        PromptCache.new(
+          ttl: config.cache_ttl,
+          max_size: config.cache_max_size
+        )
+      when :rails
+        RailsCacheAdapter.new(
+          ttl: config.cache_ttl,
+          lock_timeout: config.cache_lock_timeout
+        )
+      else
+        raise ConfigurationError, "Unknown cache backend: #{config.cache_backend}"
+      end
     end
 
     # Build the appropriate prompt client based on prompt type

@@ -10,7 +10,7 @@ Ruby SDK for [Langfuse](https://langfuse.com) - Open-source LLM observability an
 
 - 🎯 **Prompt Management** - Fetch and compile prompts with variable substitution
 - 📊 **LLM Tracing** - Built on OpenTelemetry for distributed tracing
-- ⚡ **In-Memory Caching** - Thread-safe caching with TTL and LRU eviction
+- ⚡ **Flexible Caching** - In-memory or Rails.cache (Redis) backends with TTL
 - 💬 **Text & Chat Prompts** - Support for both simple text and chat/completion formats
 - 🔧 **Mustache Templating** - Logic-less variable substitution with nested objects and lists
 - 🔄 **Automatic Retries** - Built-in retry logic with exponential backoff
@@ -41,9 +41,9 @@ Langfuse.configure do |config|
   config.public_key = ENV['LANGFUSE_PUBLIC_KEY']
   config.secret_key = ENV['LANGFUSE_SECRET_KEY']
   config.base_url = "https://cloud.langfuse.com"  # Optional (default)
-  config.cache_ttl = 60       # Cache prompts for 60 seconds (optional)
-  config.cache_max_size = 1000  # Max cached prompts (optional)
-  config.timeout = 5          # Request timeout in seconds (optional)
+  config.cache_ttl = 60           # Cache prompts for 60 seconds (optional)
+  config.cache_backend = :memory  # :memory (default) or :rails for distributed cache
+  config.timeout = 5              # Request timeout in seconds (optional)
 end
 ```
 
@@ -272,8 +272,10 @@ Langfuse.configure do |config|
   config.timeout = 5                              # Seconds (default: 5)
 
   # Optional: Caching
-  config.cache_ttl = 60           # Cache TTL in seconds (default: 60, 0 = disabled)
-  config.cache_max_size = 1000    # Max cached prompts (default: 1000)
+  config.cache_backend = :memory      # :memory (default) or :rails
+  config.cache_ttl = 60               # Cache TTL in seconds (default: 60, 0 = disabled)
+  config.cache_max_size = 1000        # Max cached prompts (default: 1000, only for :memory backend)
+  config.cache_lock_timeout = 10      # Lock timeout in seconds (default: 10, only for :rails backend)
 
   # Optional: Logging
   config.logger = Rails.logger    # Custom logger (default: Logger.new($stdout))
@@ -311,9 +313,19 @@ client = Langfuse::Client.new(config)
 
 ## Caching
 
-Built-in thread-safe caching with TTL and LRU eviction:
+The SDK supports two caching backends:
+
+### In-Memory Cache (Default)
+
+Built-in thread-safe in-memory caching with TTL and LRU eviction:
 
 ```ruby
+Langfuse.configure do |config|
+  config.cache_backend = :memory      # Default
+  config.cache_ttl = 60               # Cache for 60 seconds
+  config.cache_max_size = 1000        # Max 1000 prompts in memory
+end
+
 # First call hits the API
 prompt1 = Langfuse.client.get_prompt("greeting")  # API call
 
@@ -325,11 +337,65 @@ v1 = Langfuse.client.get_prompt("greeting", version: 1)  # API call
 v2 = Langfuse.client.get_prompt("greeting", version: 2)  # API call
 ```
 
-**Cache Features:**
+**In-Memory Cache Features:**
 - Thread-safe with Monitor-based synchronization
 - TTL-based expiration
 - LRU eviction when max_size is reached
-- Separate cache keys for name, version, and label combinations
+- Perfect for single-process apps, scripts, and Sidekiq workers
+- No external dependencies
+
+### Rails.cache Backend (Distributed)
+
+For multi-process deployments (e.g., large Rails apps with many Passenger/Puma workers):
+
+```ruby
+# config/initializers/langfuse.rb
+Langfuse.configure do |config|
+  config.public_key = ENV['LANGFUSE_PUBLIC_KEY']
+  config.secret_key = ENV['LANGFUSE_SECRET_KEY']
+  config.cache_backend = :rails      # Use Rails.cache (typically Redis)
+  config.cache_ttl = 300              # 5 minutes
+end
+```
+
+**Rails.cache Backend Features:**
+- Shared cache across all processes and servers
+- Distributed caching with Redis/Memcached
+- **Automatic stampede protection** with distributed locks
+- Exponential backoff (50ms, 100ms, 200ms) when waiting for locks
+- No max_size limit (managed by Redis/Memcached)
+- Ideal for large-scale deployments (100+ processes)
+
+**How Stampede Protection Works:**
+
+When using Rails.cache backend, the SDK automatically prevents "thundering herd" problems:
+
+1. **Cache Miss**: First process acquires distributed lock, fetches from API
+2. **Concurrent Requests**: Other processes wait (exponential backoff) instead of hitting API
+3. **Cache Populated**: Waiting processes read from cache once first process completes
+4. **Fallback**: If lock holder crashes, lock auto-expires (configurable timeout)
+
+```ruby
+# Configure lock timeout (default: 10 seconds)
+Langfuse.configure do |config|
+  config.cache_backend = :rails
+  config.cache_lock_timeout = 15  # Lock expires after 15s
+end
+```
+
+This is **automatic** for Rails.cache backend - no additional configuration needed!
+
+**When to use Rails.cache:**
+- Large Rails apps with many worker processes (Passenger, Puma, Unicorn)
+- Multiple servers sharing the same prompt cache
+- Deploying with 100+ processes that all need consistent cache
+- Already using Redis for Rails.cache
+
+**When to use in-memory cache:**
+- Single-process applications
+- Scripts and background jobs
+- Smaller deployments (< 10 processes)
+- When you want zero external dependencies
 
 ## Error Handling
 

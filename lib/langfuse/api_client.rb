@@ -57,7 +57,8 @@ module Langfuse
     # Fetch a prompt from the Langfuse API
     #
     # Checks cache first if caching is enabled. On cache miss, fetches from API
-    # and stores in cache.
+    # and stores in cache. When using Rails.cache backend, uses distributed lock
+    # to prevent cache stampedes.
     #
     # @param name [String] The name of the prompt
     # @param version [Integer, nil] Optional specific version number
@@ -67,29 +68,49 @@ module Langfuse
     # @raise [NotFoundError] if the prompt is not found
     # @raise [UnauthorizedError] if authentication fails
     # @raise [ApiError] for other API errors
-    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     def get_prompt(name, version: nil, label: nil)
-      # rubocop:enable Metrics/AbcSize
+      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
       raise ArgumentError, "Cannot specify both version and label" if version && label
 
-      # Check cache first if enabled
-      if cache
-        cache_key = PromptCache.build_key(name, version: version, label: label)
+      cache_key = PromptCache.build_key(name, version: version, label: label)
+
+      # Use distributed lock if cache supports it (Rails.cache backend)
+      if cache&.respond_to?(:fetch_with_lock)
+        cache.fetch_with_lock(cache_key) do
+          fetch_prompt_from_api(name, version: version, label: label)
+        end
+      elsif cache
+        # In-memory cache - use simple get/set pattern
         cached_data = cache.get(cache_key)
         return cached_data if cached_data
-      end
 
-      # Fetch from API
+        prompt_data = fetch_prompt_from_api(name, version: version, label: label)
+        cache.set(cache_key, prompt_data)
+        prompt_data
+      else
+        # No cache - fetch directly
+        fetch_prompt_from_api(name, version: version, label: label)
+      end
+    end
+
+    private
+
+    # Fetch a prompt from the API (without caching)
+    #
+    # @param name [String] The name of the prompt
+    # @param version [Integer, nil] Optional specific version number
+    # @param label [String, nil] Optional label
+    # @return [Hash] The prompt data
+    # @raise [NotFoundError] if the prompt is not found
+    # @raise [UnauthorizedError] if authentication fails
+    # @raise [ApiError] for other API errors
+    def fetch_prompt_from_api(name, version: nil, label: nil)
       params = build_prompt_params(version: version, label: label)
       path = "/api/public/v2/prompts/#{name}"
 
       response = connection.get(path, params)
-      prompt_data = handle_response(response)
-
-      # Store in cache if enabled
-      cache&.set(cache_key, prompt_data)
-
-      prompt_data
+      handle_response(response)
     rescue Faraday::RetriableResponse => e
       # Retry middleware exhausted all retries - handle the final response
       logger.error("Faraday error: Retries exhausted - #{e.response.status}")
@@ -98,8 +119,6 @@ module Langfuse
       logger.error("Faraday error: #{e.message}")
       raise ApiError, "HTTP request failed: #{e.message}"
     end
-
-    private
 
     # Build a new Faraday connection
     #

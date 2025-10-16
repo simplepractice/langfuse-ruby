@@ -43,6 +43,9 @@ module Langfuse
     # @return [Symbol] Cache backend (:memory or :rails)
     attr_accessor :cache_backend
 
+    # @return [Integer] Lock timeout in seconds for distributed cache stampede protection
+    attr_accessor :cache_lock_timeout
+
     # @return [Boolean] Enable tracing functionality
     attr_accessor :tracing_enabled
 
@@ -64,6 +67,7 @@ module Langfuse
     DEFAULT_CACHE_TTL = 60
     DEFAULT_CACHE_MAX_SIZE = 1000
     DEFAULT_CACHE_BACKEND = :memory
+    DEFAULT_CACHE_LOCK_TIMEOUT = 10
     DEFAULT_TRACING_ENABLED = false
     DEFAULT_TRACING_ASYNC = true
     DEFAULT_BATCH_SIZE = 50
@@ -82,6 +86,7 @@ module Langfuse
       @cache_ttl = DEFAULT_CACHE_TTL
       @cache_max_size = DEFAULT_CACHE_MAX_SIZE
       @cache_backend = DEFAULT_CACHE_BACKEND
+      @cache_lock_timeout = DEFAULT_CACHE_LOCK_TIMEOUT
       @tracing_enabled = DEFAULT_TRACING_ENABLED
       @tracing_async = DEFAULT_TRACING_ASYNC
       @batch_size = DEFAULT_BATCH_SIZE
@@ -104,6 +109,7 @@ module Langfuse
       raise ConfigurationError, "timeout must be positive" if timeout.nil? || timeout <= 0
       raise ConfigurationError, "cache_ttl must be non-negative" if cache_ttl.nil? || cache_ttl.negative?
       raise ConfigurationError, "cache_max_size must be positive" if cache_max_size.nil? || cache_max_size <= 0
+      raise ConfigurationError, "cache_lock_timeout must be positive" if cache_lock_timeout.nil? || cache_lock_timeout <= 0
 
       validate_cache_backend!
     end

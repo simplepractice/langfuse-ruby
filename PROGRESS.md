@@ -1,7 +1,7 @@
 # Langfuse Ruby - Development Progress Tracker
 
 **Started:** 2025-10-13
-**Current Phase:** Phase 10 Complete - Ready for 1.0 Release
+**Current Phase:** Phase 7 (Advanced Caching) In Progress - Phase 7.2 Complete
 **Last Updated:** 2025-10-16
 
 ---
@@ -19,8 +19,11 @@
 | 6: Convenience | 🟢 Complete | 100% |
 | 11: CI/CD | 🟢 Complete | 100% |
 | 10: Polish & Release | 🟢 Complete | 100% |
+| 7.1: Rails.cache Adapter | 🟢 Complete | 100% |
+| 7.2: Stampede Protection | 🟢 Complete | 100% |
+| 7.3: Stale-While-Revalidate | 📝 Designed | 0% |
+| 7.4: Cache Warming | ⬜ Optional | 0% |
 | 6.4: Instrumentation | ⬜ Optional | 0% |
-| 7: Advanced Caching | ⬜ Optional | 0% |
 | 8: CRUD Operations | ⬜ Not Needed | 0% |
 | 9: LangChain | ⬜ Not Needed | 0% |
 
@@ -29,6 +32,7 @@
 - 🔵 In Progress
 - 🟢 Complete
 - 🟡 Blocked
+- 📝 Designed (not implemented)
 
 ---
 
@@ -97,7 +101,7 @@
   - Coverage: 99.63% (267/268 lines)
   - Deferred Phase 6.4 (instrumentation hooks) to post-launch as optional feature
 
-### 2025-10-16
+### 2025-10-16 (Morning)
 - ✅ Phase 11 Complete: CI/CD & Automation
   - GitHub Actions workflow configured
   - Multi-version Ruby testing (3.2, 3.3)
@@ -112,6 +116,32 @@
   - Created Rails Integration Guide (docs/RAILS.md)
   - Created Migration Guide from hardcoded prompts (docs/MIGRATION.md)
   - All documentation complete and ready for 1.0 release
+
+### 2025-10-16 (Afternoon)
+- ✅ Phase 7.1 Complete: Rails.cache Adapter
+  - Created RailsCacheAdapter class wrapping Rails.cache for distributed caching
+  - Implemented adapter factory pattern in Client for backend selection
+  - Added 22 new tests for RailsCacheAdapter
+  - Updated documentation with Rails.cache backend examples
+  - 313 total tests passing, 97.96% coverage
+
+- ✅ Phase 7.2 Complete: Distributed Stampede Protection
+  - Added cache_lock_timeout config (default: 10 seconds, configurable)
+  - Implemented fetch_with_lock in RailsCacheAdapter with distributed locking
+  - Exponential backoff wait strategy: 50ms, 100ms, 200ms (3 retries)
+  - Automatic lock release with ensure block (handles errors gracefully)
+  - Fallback to API fetch if cache still empty after waiting
+  - ApiClient automatically uses fetch_with_lock when available (Rails.cache backend)
+  - 10 new tests for stampede protection including concurrency scenarios
+  - 323 total tests passing, 97.7% coverage
+  - Prevents thundering herd: 1 API call instead of 1,200 on cache miss
+
+- 📝 Phase 7.3 Designed: Stale-While-Revalidate (Not Implemented)
+  - Comprehensive design document created (docs/STALE_WHILE_REVALIDATE_DESIGN.md)
+  - Thread pool sizing analysis: 5 threads handles 100+ prompts
+  - Trade-offs documented: complexity vs marginal latency improvement
+  - Decision: Defer implementation - Phase 7.1 + 7.2 provide excellent performance
+  - Can revisit if P99 latency becomes a production issue
 
 ### 2025-10-15
 - ✅ Phase 4.1 Complete: Simple Caching
@@ -174,6 +204,16 @@
 - **CRUD Not Needed**: Create/update prompt operations not relevant to current use case
 - **LangChain Not Needed**: Not using langchain-rb framework, working with LLM APIs directly
 - **Next Phase**: Phase 10 (Polish & 1.0 Release) - final documentation and gem publication
+
+**2025-10-16 - Phase 7.3 (Stale-While-Revalidate) Deferred**
+- **Decision**: Document SWR design but defer implementation
+- **Context**: Phase 7.1 (Rails.cache) + 7.2 (stampede protection) already provide excellent performance
+- **Analysis**: Stampede protection ensures only 1 API call per cache miss (not 1,200)
+- **Trade-off**: SWR adds complexity (thread pool, concurrent-ruby dependency, metadata storage) for marginal latency benefit
+- **Current Performance**: 100ms latency hit happens very infrequently (once per TTL window)
+- **Documentation**: Comprehensive design doc created at docs/STALE_WHILE_REVALIDATE_DESIGN.md
+- **When to Reconsider**: If P99 latency becomes a production issue, or Langfuse API slows significantly (>500ms)
+- **Next**: Consider Phase 7.4 (cache warming) as simpler alternative for deployment scenarios
 
 ---
 
