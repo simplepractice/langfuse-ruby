@@ -124,7 +124,11 @@ RSpec.describe Langfuse::CacheWarmer do
     context "when API error occurs" do
       before do
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts/greeting")
-          .to_return(status: 500, body: { message: "Internal error" }.to_json, headers: { "Content-Type" => "application/json" })
+          .to_return(
+            status: 500,
+            body: { message: "Internal error" }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
       end
 
       it "returns failed result with error message" do
@@ -140,7 +144,11 @@ RSpec.describe Langfuse::CacheWarmer do
       before do
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts/greeting")
           .with(query: { version: "2" })
-          .to_return(status: 200, body: text_prompt_response.merge("version" => 2).to_json, headers: { "Content-Type" => "application/json" })
+          .to_return(
+            status: 200,
+            body: text_prompt_response.merge("version" => 2).to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
       end
 
       it "fetches prompts with specified versions" do
@@ -208,6 +216,7 @@ RSpec.describe Langfuse::CacheWarmer do
       end
     end
 
+    # rubocop:disable RSpec/MultipleMemoizedHelpers
     context "when cache is disabled" do
       let(:no_cache_config) do
         Langfuse::Config.new do |c|
@@ -224,6 +233,7 @@ RSpec.describe Langfuse::CacheWarmer do
         expect(no_cache_warmer.cache_enabled?).to be false
       end
     end
+    # rubocop:enable RSpec/MultipleMemoizedHelpers
   end
 
   describe "#warm_all" do
@@ -242,7 +252,11 @@ RSpec.describe Langfuse::CacheWarmer do
       before do
         # Stub the list_prompts API call
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts")
-          .to_return(status: 200, body: prompts_list_response.to_json, headers: { "Content-Type" => "application/json" })
+          .to_return(
+            status: 200,
+            body: prompts_list_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
 
         # Stub individual prompt fetches WITH "production" label (default)
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts/greeting")
@@ -299,7 +313,11 @@ RSpec.describe Langfuse::CacheWarmer do
     context "when some prompts fail to warm" do
       before do
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts")
-          .to_return(status: 200, body: prompts_list_response.to_json, headers: { "Content-Type" => "application/json" })
+          .to_return(
+            status: 200,
+            body: prompts_list_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
 
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts/greeting")
           .with(query: { label: "production" })
@@ -321,12 +339,20 @@ RSpec.describe Langfuse::CacheWarmer do
     context "with specific versions" do
       before do
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts")
-          .to_return(status: 200, body: prompts_list_response.to_json, headers: { "Content-Type" => "application/json" })
+          .to_return(
+            status: 200,
+            body: prompts_list_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
 
         # Version takes precedence - when version is specified, label is NOT sent
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts/greeting")
           .with(query: { version: "2" })
-          .to_return(status: 200, body: text_prompt_response.merge("version" => 2).to_json, headers: { "Content-Type" => "application/json" })
+          .to_return(
+            status: 200,
+            body: text_prompt_response.merge("version" => 2).to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
 
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts/conversation")
           .with(query: { label: "production" })
@@ -348,7 +374,11 @@ RSpec.describe Langfuse::CacheWarmer do
     context "with custom default label" do
       before do
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts")
-          .to_return(status: 200, body: prompts_list_response.to_json, headers: { "Content-Type" => "application/json" })
+          .to_return(
+            status: 200,
+            body: prompts_list_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
 
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts/greeting")
           .with(query: { label: "staging" })
@@ -373,7 +403,11 @@ RSpec.describe Langfuse::CacheWarmer do
     context "with label overrides" do
       before do
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts")
-          .to_return(status: 200, body: prompts_list_response.to_json, headers: { "Content-Type" => "application/json" })
+          .to_return(
+            status: 200,
+            body: prompts_list_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
 
         stub_request(:get, "https://cloud.langfuse.com/api/public/v2/prompts/greeting")
           .with(query: { label: "staging" })
@@ -465,6 +499,7 @@ RSpec.describe Langfuse::CacheWarmer do
       end
     end
 
+    # rubocop:disable RSpec/MultipleMemoizedHelpers
     context "when cache is disabled" do
       let(:no_cache_config) do
         Langfuse::Config.new do |c|
@@ -481,5 +516,6 @@ RSpec.describe Langfuse::CacheWarmer do
         expect(no_cache_warmer.cache_stats).to be_nil
       end
     end
+    # rubocop:enable RSpec/MultipleMemoizedHelpers
   end
 end
