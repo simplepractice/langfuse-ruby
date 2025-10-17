@@ -50,7 +50,7 @@ RSpec/ExampleLength:
   Max: 32
 
 RSpec/MultipleExpectations:
-  Max: 5
+  Enabled: false
 
 RSpec/NestedGroups:
   Max: 4
@@ -65,6 +65,9 @@ RSpec/MessageSpies:
   Enabled: false
 
 RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/StubbedMock:
   Enabled: false
 
 # Capybara - disable to avoid cop bugs
