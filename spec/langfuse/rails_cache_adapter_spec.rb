@@ -13,8 +13,8 @@ RSpec.describe Langfuse::RailsCacheAdapter do
         @cache ||= nil
       end
 
-      def self.cache=(value)
-        @cache = value
+      class << self
+        attr_writer :cache
       end
     end
 
@@ -416,7 +416,7 @@ RSpec.describe Langfuse::RailsCacheAdapter do
   describe "stampede protection behavior" do
     let(:adapter) { described_class.new(ttl: 60) }
 
-    it "should respond to fetch_with_lock" do
+    it "responds to fetch_with_lock" do
       expect(adapter).to respond_to(:fetch_with_lock)
     end
 

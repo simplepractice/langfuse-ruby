@@ -54,6 +54,41 @@ module Langfuse
       end
     end
 
+    # List all prompts in the Langfuse project
+    #
+    # Fetches a list of all prompt names available in your project.
+    # Note: This returns metadata only, not full prompt content.
+    #
+    # @param page [Integer, nil] Optional page number for pagination
+    # @param limit [Integer, nil] Optional limit per page (default: API default)
+    # @return [Array<Hash>] Array of prompt metadata hashes
+    # @raise [UnauthorizedError] if authentication fails
+    # @raise [ApiError] for other API errors
+    #
+    # @example
+    #   prompts = api_client.list_prompts
+    #   prompts.each do |prompt|
+    #     puts "#{prompt['name']} (v#{prompt['version']})"
+    #   end
+    def list_prompts(page: nil, limit: nil)
+      params = {}
+      params[:page] = page if page
+      params[:limit] = limit if limit
+
+      path = "/api/public/v2/prompts"
+      response = connection.get(path, params)
+      result = handle_response(response)
+
+      # API returns { data: [...], meta: {...} }
+      result["data"] || []
+    rescue Faraday::RetriableResponse => e
+      logger.error("Faraday error: Retries exhausted - #{e.response.status}")
+      handle_response(e.response)
+    rescue Faraday::Error => e
+      logger.error("Faraday error: #{e.message}")
+      raise ApiError, "HTTP request failed: #{e.message}"
+    end
+
     # Fetch a prompt from the Langfuse API
     #
     # Checks cache first if caching is enabled. On cache miss, fetches from API
@@ -68,9 +103,7 @@ module Langfuse
     # @raise [NotFoundError] if the prompt is not found
     # @raise [UnauthorizedError] if authentication fails
     # @raise [ApiError] for other API errors
-    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     def get_prompt(name, version: nil, label: nil)
-      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
       raise ArgumentError, "Cannot specify both version and label" if version && label
 
       cache_key = PromptCache.build_key(name, version: version, label: label)

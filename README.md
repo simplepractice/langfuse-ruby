@@ -119,7 +119,12 @@ prompt = Langfuse.client.get_prompt("greeting", version: 2)
 
 # Fetch by label
 production_prompt = Langfuse.client.get_prompt("greeting", label: "production")
+
+# Note: version and label are mutually exclusive
+# client.get_prompt("greeting", version: 2, label: "production")  # Raises ArgumentError
 ```
+
+**Important:** The `version` and `label` parameters are **mutually exclusive**. You can specify one or the other, but not both. When using cache warming with version overrides, the SDK automatically handles this - prompts with version overrides won't send the default label.
 
 ### Advanced Templating
 
@@ -397,6 +402,101 @@ This is **automatic** for Rails.cache backend - no additional configuration need
 - Smaller deployments (< 10 processes)
 - When you want zero external dependencies
 
+### Cache Warming
+
+Pre-warm the cache during deployment to prevent cold-start API calls:
+
+**Auto-Discovery (Recommended):**
+
+The SDK can automatically discover and warm ALL prompts in your Langfuse project. **By default, it fetches prompts with the "production" label** to ensure you're warming production-ready prompts during deployment.
+
+```bash
+# Rake task - automatically discovers all prompts with "production" label
+bundle exec rake langfuse:warm_cache_all
+```
+
+```ruby
+# Programmatically - warms all prompts with "production" label
+warmer = Langfuse::CacheWarmer.new
+results = warmer.warm_all
+
+puts "Cached #{results[:success].size} prompts"
+# => Cached 12 prompts (automatically discovered with "production" label)
+
+# Warm with a different label (e.g., staging)
+results = warmer.warm_all(default_label: "staging")
+
+# Warm latest versions (no label)
+results = warmer.warm_all(default_label: nil)
+```
+
+**Manual Prompt List:**
+
+Or specify exact prompts to warm:
+
+```bash
+# In your deploy script (Capistrano, etc.)
+bundle exec rake langfuse:warm_cache[greeting,conversation,rag-pipeline]
+
+# Or via environment variable
+LANGFUSE_PROMPTS_TO_WARM=greeting,conversation rake langfuse:warm_cache
+```
+
+```ruby
+# In deployment scripts or initializers
+warmer = Langfuse::CacheWarmer.new
+results = warmer.warm(['greeting', 'conversation', 'rag-pipeline'])
+
+puts "Cached #{results[:success].size} prompts"
+# => Cached 3 prompts
+
+# With error handling
+if results[:failed].any?
+  results[:failed].each do |failure|
+    logger.warn "Failed to cache #{failure[:name]}: #{failure[:error]}"
+  end
+end
+
+# Strict mode - raise on any failures
+warmer.warm!(['greeting', 'conversation'])  # Raises CacheWarmingError if any fail
+```
+
+**With specific versions or labels:**
+```ruby
+# Auto-discovery with version overrides (version takes precedence over label)
+warmer.warm_all(
+  versions: { 'greeting' => 2 }  # greeting uses version 2, others use "production" label
+)
+
+# Override label for specific prompts
+warmer.warm_all(
+  default_label: "production",
+  labels: { 'greeting' => 'staging' }  # greeting uses "staging", others use "production"
+)
+
+# Manual list with versions/labels
+warmer.warm(
+  ['greeting', 'conversation'],
+  versions: { 'greeting' => 2 },
+  labels: { 'conversation' => 'production' }
+)
+```
+
+**Available Rake Tasks:**
+```bash
+# Auto-discover and warm ALL prompts (recommended for deployment)
+rake langfuse:warm_cache_all
+
+# Warm cache with specific prompts
+rake langfuse:warm_cache[prompt1,prompt2,prompt3]
+
+# List prompt details
+LANGFUSE_PROMPT_NAMES=greeting,conversation rake langfuse:list_prompts
+
+# Clear the cache
+rake langfuse:clear_cache
+```
+
 ## Error Handling
 
 ```ruby
@@ -459,6 +559,9 @@ end
 ```ruby
 # Get a prompt (returns TextPromptClient or ChatPromptClient)
 client.get_prompt(name, version: nil, label: nil)
+
+# List all prompts in your Langfuse project
+client.list_prompts(page: nil, limit: nil)  # Returns Array of prompt metadata
 
 # Get and compile in one call
 client.compile_prompt(name, variables: {}, version: nil, label: nil, fallback: nil, type: nil)

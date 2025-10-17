@@ -78,6 +78,26 @@ module Langfuse
       build_fallback_prompt_client(name, fallback, type)
     end
 
+    # List all prompts in the Langfuse project
+    #
+    # Fetches a list of all prompt names available in your project.
+    # Returns metadata only, not full prompt content.
+    #
+    # @param page [Integer, nil] Optional page number for pagination
+    # @param limit [Integer, nil] Optional limit per page
+    # @return [Array<Hash>] Array of prompt metadata hashes
+    # @raise [UnauthorizedError] if authentication fails
+    # @raise [ApiError] for other API errors
+    #
+    # @example
+    #   prompts = client.list_prompts
+    #   prompts.each do |prompt|
+    #     puts "#{prompt['name']} (v#{prompt['version']})"
+    #   end
+    def list_prompts(page: nil, limit: nil)
+      api_client.list_prompts(page: page, limit: limit)
+    end
+
     # Convenience method: fetch and compile a prompt in one call
     #
     # This is a shorthand for calling get_prompt followed by compile.

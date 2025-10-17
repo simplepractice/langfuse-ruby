@@ -22,7 +22,7 @@
 | 7.1: Rails.cache Adapter | 🟢 Complete | 100% |
 | 7.2: Stampede Protection | 🟢 Complete | 100% |
 | 7.3: Stale-While-Revalidate | 📝 Designed | 0% |
-| 7.4: Cache Warming | ⬜ Optional | 0% |
+| 7.4: Cache Warming | 🟢 Complete | 100% |
 | 6.4: Instrumentation | ⬜ Optional | 0% |
 | 8: CRUD Operations | ⬜ Not Needed | 0% |
 | 9: LangChain | ⬜ Not Needed | 0% |
@@ -142,6 +142,16 @@
   - Trade-offs documented: complexity vs marginal latency improvement
   - Decision: Defer implementation - Phase 7.1 + 7.2 provide excellent performance
   - Can revisit if P99 latency becomes a production issue
+
+- ✅ Phase 7.4 Complete: Cache Warming Utilities
+  - Created rake task: `langfuse:warm_cache` for deployment automation
+  - Added `Langfuse::CacheWarmer` helper class for programmatic use
+  - Support for specific versions and labels
+  - `warm!` strict mode raises on failures (useful for CI/CD)
+  - Additional rake tasks: `list_prompts`, `clear_cache`
+  - 16 new tests for cache warming functionality
+  - 339 total tests passing, 97.68% coverage
+  - Prevents cold-start API spikes on deployment
 
 ### 2025-10-15
 - ✅ Phase 4.1 Complete: Simple Caching

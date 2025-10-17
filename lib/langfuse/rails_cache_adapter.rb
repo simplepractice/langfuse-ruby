@@ -154,8 +154,8 @@ module Langfuse
       Rails.cache.write(
         lock_key,
         true,
-        unless_exist: true,      # Atomic: only write if key doesn't exist
-        expires_in: lock_timeout  # Auto-expire to prevent deadlocks
+        unless_exist: true, # Atomic: only write if key doesn't exist
+        expires_in: lock_timeout # Auto-expire to prevent deadlocks
       )
     end
 

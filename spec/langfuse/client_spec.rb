@@ -95,8 +95,8 @@ RSpec.describe Langfuse::Client do
             @cache ||= nil
           end
 
-          def self.cache=(value)
-            @cache = value
+          class << self
+            attr_writer :cache
           end
         end
 
@@ -774,6 +774,126 @@ RSpec.describe Langfuse::Client do
             fallback: "Hello!"
           )
         end.to raise_error(ArgumentError, /type parameter is required/)
+      end
+    end
+  end
+
+  describe "#list_prompts" do
+    let(:client) { described_class.new(valid_config) }
+    let(:base_url) { valid_config.base_url }
+
+    let(:prompts_list_response) do
+      {
+        "data" => [
+          { "name" => "greeting", "version" => 1, "type" => "text" },
+          { "name" => "conversation", "version" => 2, "type" => "chat" },
+          { "name" => "rag-pipeline", "version" => 1, "type" => "text" }
+        ],
+        "meta" => { "totalItems" => 3, "page" => 1 }
+      }
+    end
+
+    context "without pagination" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts")
+          .to_return(
+            status: 200,
+            body: prompts_list_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "returns list of prompts" do
+        result = client.list_prompts
+
+        expect(result).to be_an(Array)
+        expect(result.size).to eq(3)
+      end
+
+      it "returns prompt metadata" do
+        result = client.list_prompts
+
+        expect(result.first).to have_key("name")
+        expect(result.first).to have_key("version")
+        expect(result.first).to have_key("type")
+      end
+
+      it "makes request without query parameters" do
+        client.list_prompts
+
+        expect(
+          a_request(:get, "#{base_url}/api/public/v2/prompts")
+            .with(query: {})
+        ).to have_been_made.once
+      end
+    end
+
+    context "with pagination parameters" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts")
+          .with(query: { page: "2", limit: "10" })
+          .to_return(
+            status: 200,
+            body: prompts_list_response.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "passes pagination parameters to API" do
+        client.list_prompts(page: 2, limit: 10)
+
+        expect(
+          a_request(:get, "#{base_url}/api/public/v2/prompts")
+            .with(query: { page: "2", limit: "10" })
+        ).to have_been_made.once
+      end
+    end
+
+    context "when authentication fails" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts")
+          .to_return(status: 401, body: { message: "Unauthorized" }.to_json)
+      end
+
+      it "raises UnauthorizedError" do
+        expect do
+          client.list_prompts
+        end.to raise_error(Langfuse::UnauthorizedError)
+      end
+    end
+
+    context "when API error occurs" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts")
+          .to_return(
+            status: 500,
+            body: { message: "Internal server error" }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "raises ApiError" do
+        expect do
+          client.list_prompts
+        end.to raise_error(Langfuse::ApiError, /API request failed/)
+      end
+    end
+
+    context "when no prompts exist" do
+      before do
+        stub_request(:get, "#{base_url}/api/public/v2/prompts")
+          .to_return(
+            status: 200,
+            body: { "data" => [], "meta" => {} }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+      end
+
+      it "returns empty array" do
+        result = client.list_prompts
+
+        expect(result).to be_an(Array)
+        expect(result).to be_empty
       end
     end
   end

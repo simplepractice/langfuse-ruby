@@ -1627,7 +1627,6 @@ After implementation, the SDK should achieve:
 - [OpenTelemetry Ruby](https://opentelemetry.io/docs/instrumentation/ruby/)
 - [OpenTelemetry Specification](https://opentelemetry.io/docs/specs/otel/)
 - [W3C Trace Context](https://www.w3.org/TR/trace-context/)
-- [LaunchDarkly Ruby SDK](https://github.com/launchdarkly/ruby-server-sdk) (API inspiration)
 - [Datadog OpenTelemetry](https://docs.datadoghq.com/tracing/setup_overview/open_standards/otel/)
 
 ---

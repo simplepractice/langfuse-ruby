@@ -109,7 +109,11 @@ module Langfuse
       raise ConfigurationError, "timeout must be positive" if timeout.nil? || timeout <= 0
       raise ConfigurationError, "cache_ttl must be non-negative" if cache_ttl.nil? || cache_ttl.negative?
       raise ConfigurationError, "cache_max_size must be positive" if cache_max_size.nil? || cache_max_size <= 0
-      raise ConfigurationError, "cache_lock_timeout must be positive" if cache_lock_timeout.nil? || cache_lock_timeout <= 0
+
+      if cache_lock_timeout.nil? || cache_lock_timeout <= 0
+        raise ConfigurationError,
+              "cache_lock_timeout must be positive"
+      end
 
       validate_cache_backend!
     end

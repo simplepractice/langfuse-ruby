@@ -4,10 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is the official **Langfuse Ruby SDK**, providing LLM tracing, observability, and prompt management capabilities. The project is being built from scratch following an iterative, test-driven approach inspired by LaunchDarkly's API design patterns.
+This is the official **Langfuse Ruby SDK**, providing LLM tracing, observability, and prompt management capabilities. The project is being built from scratch following an iterative, test-driven approach.
 
 **Key Design Principles:**
-- **LaunchDarkly-Inspired API**: Flat API surface with all methods on `Client` (not nested managers)
 - **Rails-Friendly**: Global configuration pattern with `Langfuse.configure` block
 - **Iterative Development**: Build small, testable increments following the implementation plan
 - **Minimal Dependencies**: Only add dependencies when needed
@@ -85,7 +84,7 @@ lib/langfuse/
 
 ### API Design Pattern (Critical!)
 
-**✅ CORRECT - Flat API (LaunchDarkly style):**
+**✅ CORRECT - Flat API:**
 ```ruby
 client.get_prompt("name")
 client.compile_prompt("name", variables: {})
@@ -250,7 +249,6 @@ Uses **Mustache templating** (logic-less, no conditionals/loops):
 - **Design Document**: `langfuse-ruby-prompt-management-design.md` - Complete API specification
 - **Implementation Plan**: `IMPLEMENTATION_PLAN.md` - Phase-by-phase development plan
 - **Quick Reference**: `QUICK_REFERENCE.md` - Patterns and conventions
-- **LaunchDarkly Ruby SDK**: https://github.com/launchdarkly/ruby-server-sdk (API inspiration)
 - **Langfuse API Docs**: https://langfuse.com/docs/api
 - **Langfuse TypeScript SDK**: https://github.com/langfuse/langfuse-js (reference implementation)
 
@@ -269,3 +267,4 @@ After each phase, the gem should be able to:
 - **Phase 8**: Create and update prompts via API
 - **Phase 9**: Convert prompts to LangChain format
 - **Phase 10**: 1.0 Release ready with full documentation
+- The documentation for the REST api can be found at this url: https://api.reference.langfuse.com/

@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+# Set minimal permissions for security (Principle of Least Privilege)
+# Override with specific permissions in jobs as needed
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
