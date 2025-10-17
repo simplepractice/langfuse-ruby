@@ -58,20 +58,7 @@ module Langfuse
       results = { success: [], failed: [] }
 
       prompt_names.each do |name|
-        options = {}
-        options[:version] = versions[name] if versions[name]
-        options[:label] = labels[name] if labels[name]
-
-        client.get_prompt(name, **options)
-        results[:success] << name
-      rescue NotFoundError
-        results[:failed] << { name: name, error: "Not found" }
-      rescue UnauthorizedError
-        results[:failed] << { name: name, error: "Unauthorized" }
-      rescue ApiError => e
-        results[:failed] << { name: name, error: e.message }
-      rescue StandardError => e
-        results[:failed] << { name: name, error: e.message }
+        warm_single_prompt(name, results, versions, labels)
       end
 
       results
@@ -179,6 +166,51 @@ module Langfuse
       stats[:size] = cache.size if cache.respond_to?(:size)
       stats[:max_size] = cache.max_size if cache.respond_to?(:max_size)
       stats
+    end
+
+    private
+
+    # Warm a single prompt and update results
+    #
+    # @param name [String] Prompt name
+    # @param results [Hash] Results hash to update
+    # @param versions [Hash] Version numbers per prompt
+    # @param labels [Hash] Labels per prompt
+    # @return [void]
+    def warm_single_prompt(name, results, versions, labels)
+      options = build_prompt_options(name, versions, labels)
+
+      client.get_prompt(name, **options)
+      results[:success] << name
+    rescue NotFoundError
+      record_failure(results, name, "Not found")
+    rescue UnauthorizedError
+      record_failure(results, name, "Unauthorized")
+    rescue ApiError, StandardError => e
+      record_failure(results, name, e.message)
+    end
+
+    # Build options hash for get_prompt
+    #
+    # @param name [String] Prompt name
+    # @param versions [Hash] Version numbers per prompt
+    # @param labels [Hash] Labels per prompt
+    # @return [Hash] Options hash
+    def build_prompt_options(name, versions, labels)
+      options = {}
+      options[:version] = versions[name] if versions[name]
+      options[:label] = labels[name] if labels[name]
+      options
+    end
+
+    # Record a prompt failure
+    #
+    # @param results [Hash] Results hash to update
+    # @param name [String] Prompt name
+    # @param error [String] Error message
+    # @return [void]
+    def record_failure(results, name, error)
+      results[:failed] << { name: name, error: error }
     end
   end
 

@@ -116,11 +116,11 @@ module Langfuse
     # Check if cache is empty
     #
     # Note: Rails.cache doesn't provide an efficient way to check if empty,
-    # so we return nil to indicate this operation is not supported.
+    # so we return false to indicate this operation is not supported.
     #
-    # @return [nil]
+    # @return [Boolean] Always returns false (unsupported operation)
     def empty?
-      nil
+      false
     end
 
     # Build a cache key from prompt name and options

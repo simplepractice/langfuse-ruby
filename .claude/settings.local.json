@@ -10,7 +10,8 @@
       "WebSearch",
       "Read(//Users/noah/dev/simplepractice/simplepractice/**)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:langfuse.com)"
+      "WebFetch(domain:langfuse.com)",
+      "Bash(gh run list:*)"
     ],
     "deny": [],
     "ask": []

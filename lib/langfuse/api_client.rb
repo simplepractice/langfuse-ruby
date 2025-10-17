@@ -109,7 +109,7 @@ module Langfuse
       cache_key = PromptCache.build_key(name, version: version, label: label)
 
       # Use distributed lock if cache supports it (Rails.cache backend)
-      if cache&.respond_to?(:fetch_with_lock)
+      if cache.respond_to?(:fetch_with_lock)
         cache.fetch_with_lock(cache_key) do
           fetch_prompt_from_api(name, version: version, label: label)
         end

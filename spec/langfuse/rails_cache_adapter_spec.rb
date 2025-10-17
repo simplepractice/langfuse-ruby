@@ -160,8 +160,8 @@ RSpec.describe Langfuse::RailsCacheAdapter do
   describe "#empty?" do
     let(:adapter) { described_class.new }
 
-    it "returns nil (not supported by Rails.cache)" do
-      expect(adapter.empty?).to be_nil
+    it "returns false (not supported by Rails.cache)" do
+      expect(adapter.empty?).to be false
     end
   end
 

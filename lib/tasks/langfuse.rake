@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/BlockLength
 namespace :langfuse do
   desc "Warm the Langfuse prompt cache with specified prompts"
   task :warm_cache, [:prompts] => :environment do |_t, args|
@@ -50,23 +51,7 @@ namespace :langfuse do
     end
 
     puts ""
-    puts "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    puts "Cache Warming Results"
-    puts "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    puts "✓ Success: #{results[:success].size}/#{prompts.size}"
-    puts "✗ Failed:  #{results[:failed].size}/#{prompts.size}"
-
-    if results[:failed].any?
-      puts ""
-      puts "Failed prompts:"
-      results[:failed].each do |failure|
-        puts "  - #{failure[:name]}: #{failure[:error]}"
-      end
-      exit 1
-    else
-      puts ""
-      puts "All prompts cached successfully! 🎉"
-    end
+    display_warming_results(results, prompts.size)
   end
 
   desc "Warm the cache with ALL prompts (auto-discovery)"
@@ -106,23 +91,7 @@ namespace :langfuse do
       end
 
       puts ""
-      puts "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      puts "Cache Warming Results"
-      puts "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      puts "✓ Success: #{results[:success].size}/#{prompt_names.size}"
-      puts "✗ Failed:  #{results[:failed].size}/#{prompt_names.size}"
-
-      if results[:failed].any?
-        puts ""
-        puts "Failed prompts:"
-        results[:failed].each do |failure|
-          puts "  - #{failure[:name]}: #{failure[:error]}"
-        end
-        exit 1
-      else
-        puts ""
-        puts "All prompts cached successfully! 🎉"
-      end
+      display_warming_results(results, prompt_names.size)
     rescue Langfuse::UnauthorizedError
       puts "✗ Authentication failed. Check your API keys."
       exit 1
@@ -188,4 +157,25 @@ namespace :langfuse do
       exit 1
     end
   end
+
+  # Helper method to display warming results
+  def display_warming_results(results, total)
+    puts "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    puts "Cache Warming Results"
+    puts "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    puts "✓ Success: #{results[:success].size}/#{total}"
+    puts "✗ Failed:  #{results[:failed].size}/#{total}"
+
+    puts ""
+    if results[:failed].any?
+      puts "Failed prompts:"
+      results[:failed].each do |failure|
+        puts "  - #{failure[:name]}: #{failure[:error]}"
+      end
+      exit 1
+    else
+      puts "All prompts cached successfully! 🎉"
+    end
+  end
 end
+# rubocop:enable Metrics/BlockLength
