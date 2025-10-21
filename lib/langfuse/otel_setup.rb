@@ -2,6 +2,7 @@
 
 require "opentelemetry/sdk"
 require "opentelemetry/exporter/otlp"
+require "opentelemetry/trace/propagation/trace_context"
 require "base64"
 
 module Langfuse
@@ -58,6 +59,9 @@ module Langfuse
 
         # Set as global tracer provider
         OpenTelemetry.tracer_provider = @tracer_provider
+
+        # Configure W3C TraceContext propagator for distributed tracing (enables inject_context)
+        OpenTelemetry.propagation = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
 
         mode = config.tracing_async ? "async" : "sync"
         config.logger.info("Langfuse tracing initialized with OpenTelemetry (#{mode} mode)")

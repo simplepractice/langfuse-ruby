@@ -40,5 +40,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency "opentelemetry-exporter-otlp", "~> 0.28"
   spec.add_dependency "opentelemetry-sdk", "~> 1.4"
 
+  # Runtime dependencies - Standard library compatibility
+  spec.add_dependency "base64", "~> 0.2" # Removed from stdlib in Ruby 3.4
+
   # Development dependencies are specified in Gemfile
 end

@@ -171,15 +171,18 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
 
     describe "#inject_context" do
       it "returns W3C Trace Context headers" do
+        # Configure W3C propagator for this test (same as OtelSetup does in production)
+        OpenTelemetry.propagation = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
+
         headers = nil
         tracer.trace(name: "parent-trace") do |trace|
           headers = trace.inject_context
         end
 
-        # inject_context returns an empty hash in test environment
-        # because there's no active HTTP context to inject into
-        # The functionality is correct but requires proper OTel setup
+        # Verify W3C TraceContext format: traceparent header with version-traceid-spanid-flags
         expect(headers).to be_a(Hash)
+        expect(headers).to have_key("traceparent")
+        expect(headers["traceparent"]).to match(/^00-[a-f0-9]{32}-[a-f0-9]{16}-[0-9]{2}$/)
       end
     end
   end
