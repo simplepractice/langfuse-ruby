@@ -60,8 +60,13 @@ module Langfuse
         # Set as global tracer provider
         OpenTelemetry.tracer_provider = @tracer_provider
 
-        # Configure W3C TraceContext propagator for distributed tracing (enables inject_context)
-        OpenTelemetry.propagation = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
+        # Configure W3C TraceContext propagator if not already set
+        if OpenTelemetry.propagation.is_a?(OpenTelemetry::Context::Propagation::NoopTextMapPropagator)
+          OpenTelemetry.propagation = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
+          config.logger.debug("Langfuse: Configured W3C TraceContext propagator")
+        else
+          config.logger.debug("Langfuse: Using existing propagator: #{OpenTelemetry.propagation.class}")
+        end
 
         mode = config.tracing_async ? "async" : "sync"
         config.logger.info("Langfuse tracing initialized with OpenTelemetry (#{mode} mode)")
