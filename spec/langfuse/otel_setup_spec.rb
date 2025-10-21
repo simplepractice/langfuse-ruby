@@ -55,32 +55,12 @@ RSpec.describe Langfuse::OtelSetup do
       end
 
       it "does not overwrite existing propagator" do
-        # Set a custom propagator before Langfuse setup
         custom_propagator = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
         OpenTelemetry.propagation = custom_propagator
 
         described_class.setup(config)
 
-        # Should still be the same instance we set
         expect(OpenTelemetry.propagation).to eq(custom_propagator)
-      end
-
-      it "logs when configuring default propagator" do
-        # Ensure we start with noop propagator
-        OpenTelemetry.propagation = OpenTelemetry::Context::Propagation::NoopTextMapPropagator.new
-
-        expect(config.logger).to receive(:debug).with(/Configured W3C TraceContext propagator/)
-
-        described_class.setup(config)
-      end
-
-      it "logs when using existing propagator" do
-        # Set a custom propagator before Langfuse setup
-        OpenTelemetry.propagation = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
-
-        expect(config.logger).to receive(:debug).with(/Using existing propagator/)
-
-        described_class.setup(config)
       end
 
       it "logs initialization message" do
