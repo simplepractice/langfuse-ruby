@@ -48,6 +48,21 @@ RSpec.describe Langfuse::OtelSetup do
         expect(OpenTelemetry.tracer_provider).to eq(described_class.tracer_provider)
       end
 
+      it "configures W3C TraceContext propagator when none is set" do
+        described_class.setup(config)
+
+        expect(OpenTelemetry.propagation).to be_a(OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator)
+      end
+
+      it "does not overwrite existing propagator" do
+        custom_propagator = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
+        OpenTelemetry.propagation = custom_propagator
+
+        described_class.setup(config)
+
+        expect(OpenTelemetry.propagation).to eq(custom_propagator)
+      end
+
       it "logs initialization message" do
         expect(config.logger).to receive(:info).with(/Langfuse tracing initialized/)
 
