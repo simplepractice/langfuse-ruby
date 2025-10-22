@@ -21,8 +21,6 @@ module Langfuse
       # @return [void]
       # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       def setup(config)
-        return unless config.tracing_enabled
-
         # Create OTLP exporter configured for Langfuse
         exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
           endpoint: "#{config.base_url}/api/public/otel/v1/traces",

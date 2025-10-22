@@ -35,6 +35,11 @@ RSpec.configure do |config|
 
   # Reset global Langfuse state before each test
   config.before do
+    # Stub OTLP endpoint BEFORE reset (which may flush traces)
+    # (tests can override this with more specific stubs if needed)
+    stub_request(:post, %r{/api/public/otel/v1/traces})
+      .to_return(status: 200, body: "", headers: {})
+
     Langfuse.reset!
 
     # Configure logger to write to log file instead of stdout
