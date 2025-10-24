@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby: ['3.2', '3.3']
+        ruby: ['3.2', '3.3', '3.4']
 
     steps:
       - name: Checkout code
@@ -37,8 +37,8 @@ jobs:
       - name: Run tests
         run: bundle exec rspec
 
-      - name: Upload coverage (Ruby 3.3 only)
-        if: matrix.ruby == '3.3'
+      - name: Upload coverage (Ruby 3.4 only)
+        if: matrix.ruby == '3.4'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -46,7 +46,7 @@ jobs:
           retention-days: 7
 
       - name: Upload coverage to Codecov
-        if: matrix.ruby == '3.3'
+        if: matrix.ruby == '3.4'
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage/coverage.json
@@ -64,7 +64,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: '3.4'
           bundler-cache: true
 
       - name: Run Rubocop
