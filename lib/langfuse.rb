@@ -60,13 +60,12 @@ module Langfuse
     #   Langfuse.configure do |config|
     #     config.public_key = ENV['LANGFUSE_PUBLIC_KEY']
     #     config.secret_key = ENV['LANGFUSE_SECRET_KEY']
-    #     config.tracing_enabled = true
     #   end
     def configure
       yield(configuration)
 
-      # Auto-initialize OpenTelemetry if tracing is enabled
-      OtelSetup.setup(configuration) if configuration.tracing_enabled
+      # Auto-initialize OpenTelemetry
+      OtelSetup.setup(configuration)
 
       configuration
     end

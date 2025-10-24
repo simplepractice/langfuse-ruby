@@ -12,7 +12,6 @@ RSpec.describe Langfuse::OtelSetup do
       c.public_key = public_key
       c.secret_key = secret_key
       c.base_url = base_url
-      c.tracing_enabled = true
       c.tracing_async = true
       c.batch_size = 50
       c.flush_interval = 10
@@ -34,53 +33,38 @@ RSpec.describe Langfuse::OtelSetup do
   end
 
   describe ".setup" do
-    context "when tracing is enabled" do
-      it "initializes the tracer provider" do
-        described_class.setup(config)
+    it "initializes the tracer provider" do
+      described_class.setup(config)
 
-        expect(described_class.tracer_provider).not_to be_nil
-        expect(described_class.initialized?).to be true
-      end
-
-      it "sets the global tracer provider" do
-        described_class.setup(config)
-
-        expect(OpenTelemetry.tracer_provider).to eq(described_class.tracer_provider)
-      end
-
-      it "configures W3C TraceContext propagator when none is set" do
-        described_class.setup(config)
-
-        expect(OpenTelemetry.propagation).to be_a(OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator)
-      end
-
-      it "does not overwrite existing propagator" do
-        custom_propagator = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
-        OpenTelemetry.propagation = custom_propagator
-
-        described_class.setup(config)
-
-        expect(OpenTelemetry.propagation).to eq(custom_propagator)
-      end
-
-      it "logs initialization message" do
-        expect(config.logger).to receive(:info).with(/Langfuse tracing initialized/)
-
-        described_class.setup(config)
-      end
+      expect(described_class.tracer_provider).not_to be_nil
+      expect(described_class.initialized?).to be true
     end
 
-    context "when tracing is disabled" do
-      before do
-        config.tracing_enabled = false
-      end
+    it "sets the global tracer provider" do
+      described_class.setup(config)
 
-      it "does not initialize the tracer provider" do
-        described_class.setup(config)
+      expect(OpenTelemetry.tracer_provider).to eq(described_class.tracer_provider)
+    end
 
-        expect(described_class.tracer_provider).to be_nil
-        expect(described_class.initialized?).to be false
-      end
+    it "configures W3C TraceContext propagator when none is set" do
+      described_class.setup(config)
+
+      expect(OpenTelemetry.propagation).to be_a(OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator)
+    end
+
+    it "does not overwrite existing propagator" do
+      custom_propagator = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
+      OpenTelemetry.propagation = custom_propagator
+
+      described_class.setup(config)
+
+      expect(OpenTelemetry.propagation).to eq(custom_propagator)
+    end
+
+    it "logs initialization message" do
+      expect(config.logger).to receive(:info).with(/Langfuse tracing initialized/)
+
+      described_class.setup(config)
     end
 
     context "with async mode enabled" do
@@ -191,26 +175,14 @@ RSpec.describe Langfuse::OtelSetup do
   end
 
   describe "integration with Langfuse.configure" do
-    it "auto-initializes OTel when tracing is enabled" do
+    it "auto-initializes OTel" do
       Langfuse.configure do |c|
         c.public_key = public_key
         c.secret_key = secret_key
         c.base_url = base_url
-        c.tracing_enabled = true
       end
 
       expect(described_class.initialized?).to be true
-    end
-
-    it "does not initialize OTel when tracing is disabled" do
-      Langfuse.configure do |c|
-        c.public_key = public_key
-        c.secret_key = secret_key
-        c.base_url = base_url
-        c.tracing_enabled = false
-      end
-
-      expect(described_class.initialized?).to be false
     end
   end
 
@@ -220,7 +192,6 @@ RSpec.describe Langfuse::OtelSetup do
         c.public_key = public_key
         c.secret_key = secret_key
         c.base_url = base_url
-        c.tracing_enabled = true
         c.tracing_async = false # Sync mode for predictable testing
       end
     end

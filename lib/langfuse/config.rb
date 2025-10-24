@@ -46,9 +46,6 @@ module Langfuse
     # @return [Integer] Lock timeout in seconds for distributed cache stampede protection
     attr_accessor :cache_lock_timeout
 
-    # @return [Boolean] Enable tracing functionality
-    attr_accessor :tracing_enabled
-
     # @return [Boolean] Use async processing for traces (requires ActiveJob)
     attr_accessor :tracing_async
 
@@ -68,7 +65,6 @@ module Langfuse
     DEFAULT_CACHE_MAX_SIZE = 1000
     DEFAULT_CACHE_BACKEND = :memory
     DEFAULT_CACHE_LOCK_TIMEOUT = 10
-    DEFAULT_TRACING_ENABLED = false
     DEFAULT_TRACING_ASYNC = true
     DEFAULT_BATCH_SIZE = 50
     DEFAULT_FLUSH_INTERVAL = 10
@@ -87,7 +83,6 @@ module Langfuse
       @cache_max_size = DEFAULT_CACHE_MAX_SIZE
       @cache_backend = DEFAULT_CACHE_BACKEND
       @cache_lock_timeout = DEFAULT_CACHE_LOCK_TIMEOUT
-      @tracing_enabled = DEFAULT_TRACING_ENABLED
       @tracing_async = DEFAULT_TRACING_ASYNC
       @batch_size = DEFAULT_BATCH_SIZE
       @flush_interval = DEFAULT_FLUSH_INTERVAL

@@ -9,12 +9,11 @@ RSpec.describe "End-to-End Langfuse Integration" do
   let(:base_url) { "https://api.langfuse.test" }
 
   before do
-    # Configure Langfuse with tracing enabled
+    # Configure Langfuse
     Langfuse.configure do |config|
       config.public_key = public_key
       config.secret_key = secret_key
       config.base_url = base_url
-      config.tracing_enabled = true
     end
 
     # Stub the OTLP endpoint (new endpoint using protobuf)
