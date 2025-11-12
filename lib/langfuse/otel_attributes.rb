@@ -176,19 +176,27 @@ module Langfuse
         next if value.nil?
 
         new_key = "#{prefix}.#{key}"
-
-        if value.is_a?(Hash)
-          # Recursively flatten nested hashes
-          nested_result = flatten_metadata(value, new_key)
-          result.merge!(nested_result)
-        else
-          # Serialize non-hash values
-        serialized = serialize(value)
-          result[new_key] = serialized if serialized
-        end
+        result.merge!(flatten_hash_value(value, new_key))
       end
 
       result
+    end
+
+    # Flattens a single hash value (recursively if it's a hash, serializes otherwise)
+    #
+    # @param value [Object] Value to flatten
+    # @param key [String] Attribute key prefix
+    # @return [Hash] Flattened attributes hash
+    # @private
+    def self.flatten_hash_value(value, key)
+      if value.is_a?(Hash)
+        # Recursively flatten nested hashes
+        flatten_metadata(value, key)
+      else
+        # Serialize non-hash values
+        serialized = serialize(value)
+        serialized ? { key => serialized } : {}
+      end
     end
 
     # Normalizes attributes to a hash (handles both objects and hashes)
