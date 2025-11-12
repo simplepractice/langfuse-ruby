@@ -93,7 +93,8 @@ RSpec.describe Langfuse::OtelAttributes do
       result = described_class.flatten_metadata(metadata, "langfuse.trace.metadata")
 
       expect(result).to eq({
-                             "langfuse.trace.metadata.user" => '{"id":123,"profile":{"name":"Test"}}'
+                             "langfuse.trace.metadata.user.id" => "123",
+                             "langfuse.trace.metadata.user.profile.name" => "Test"
                            })
     end
 

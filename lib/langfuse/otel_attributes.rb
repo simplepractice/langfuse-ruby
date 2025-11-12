@@ -170,11 +170,22 @@ module Langfuse
         return serialized ? { prefix => serialized } : {}
       end
 
-      # Flatten hash metadata
+      # Recursively flatten hash metadata
       result = {}
       metadata.each do |key, value|
+        next if value.nil?
+
+        new_key = "#{prefix}.#{key}"
+
+        if value.is_a?(Hash)
+          # Recursively flatten nested hashes
+          nested_result = flatten_metadata(value, new_key)
+          result.merge!(nested_result)
+        else
+          # Serialize non-hash values
         serialized = serialize(value)
-        result["#{prefix}.#{key}"] = serialized if serialized
+          result[new_key] = serialized if serialized
+        end
       end
 
       result
