@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "langfuse/version"
+require_relative "langfuse/types"
 
 # Langfuse Ruby SDK
 #
@@ -32,6 +33,7 @@ require_relative "langfuse/rails_cache_adapter"
 require_relative "langfuse/cache_warmer"
 require_relative "langfuse/api_client"
 require_relative "langfuse/otel_setup"
+require_relative "langfuse/otel_attributes"
 require_relative "langfuse/tracer"
 require_relative "langfuse/trace"
 require_relative "langfuse/span"
