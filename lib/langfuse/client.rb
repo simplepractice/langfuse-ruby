@@ -158,7 +158,9 @@ module Langfuse
       when :rails
         RailsCacheAdapter.new(
           ttl: config.cache_ttl,
-          lock_timeout: config.cache_lock_timeout
+          lock_timeout: config.cache_lock_timeout,
+          stale_ttl: config.cache_stale_while_revalidate ? config.cache_stale_ttl : nil,
+          refresh_threads: config.cache_refresh_threads
         )
       else
         raise ConfigurationError, "Unknown cache backend: #{config.cache_backend}"
