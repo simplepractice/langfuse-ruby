@@ -31,4 +31,6 @@ PROGRESS.md
 
 langfuse-js/
 langfuse-python/
-AGENTS.md
+
+# Environment variables
+*.env
