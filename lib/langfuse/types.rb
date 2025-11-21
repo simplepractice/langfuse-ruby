@@ -154,7 +154,7 @@ module Langfuse
       # @return [Hash, nil] Token usage and other model-specific usage metrics
       attr_accessor :usage_details
 
-      # @return [Hash, nil] Cost breakdown for the generation (totalCost, etc.)
+      # @return [Hash, nil] Cost breakdown for the generation (total_cost, etc.)
       attr_accessor :cost_details
 
       # @return [Hash, nil] Information about the prompt used from Langfuse prompt management
