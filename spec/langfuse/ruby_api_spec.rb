@@ -24,7 +24,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           span_data = trace.otel_span.to_span_data
         end
 
-        expect(span_data.attributes["langfuse.user.id"]).to eq("user-123")
+        expect(span_data.attributes["user.id"]).to eq("user-123")
       end
 
       it "sets session_id attribute" do
@@ -33,7 +33,7 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
           span_data = trace.otel_span.to_span_data
         end
 
-        expect(span_data.attributes["langfuse.session.id"]).to eq("session-456")
+        expect(span_data.attributes["session.id"]).to eq("session-456")
       end
 
       it "sets metadata as individual attributes" do
@@ -183,6 +183,46 @@ RSpec.describe "Langfuse Ruby API Wrapper" do
         expect(headers).to be_a(Hash)
         expect(headers).to have_key("traceparent")
         expect(headers["traceparent"]).to match(/^00-[a-f0-9]{32}-[a-f0-9]{16}-[0-9]{2}$/)
+      end
+    end
+
+    describe "#update" do
+      it "updates trace attributes and returns self" do
+        trace_data = nil
+        result = nil
+
+        tracer.trace(name: "parent-trace") do |trace|
+          result = trace.update(
+            user_id: "user-123",
+            session_id: "session-456",
+            tags: %w[production api-v2],
+            metadata: { version: "2.1.0" }
+          )
+          trace_data = trace.otel_span.to_span_data
+        end
+
+        expect(result).to be_a(described_class)
+        expect(trace_data.attributes["user.id"]).to eq("user-123")
+        expect(trace_data.attributes["session.id"]).to eq("session-456")
+        tags = JSON.parse(trace_data.attributes["langfuse.trace.tags"])
+        expect(tags).to eq(%w[production api-v2])
+        expect(trace_data.attributes["langfuse.trace.metadata.version"]).to eq("2.1.0")
+      end
+
+      it "supports method chaining" do
+        trace_data = nil
+
+        tracer.trace(name: "parent-trace") do |trace|
+          trace.update(user_id: "user-123")
+               .update(session_id: "session-456")
+               .update(tags: ["test"])
+          trace_data = trace.otel_span.to_span_data
+        end
+
+        expect(trace_data.attributes["user.id"]).to eq("user-123")
+        expect(trace_data.attributes["session.id"]).to eq("session-456")
+        tags = JSON.parse(trace_data.attributes["langfuse.trace.tags"])
+        expect(tags).to eq(["test"])
       end
     end
   end

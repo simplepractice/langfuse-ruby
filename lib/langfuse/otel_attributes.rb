@@ -29,6 +29,8 @@ module Langfuse
   module OtelAttributes
     # Trace attributes
     TRACE_NAME = "langfuse.trace.name"
+    # TRACE_USER_ID and TRACE_SESSION_ID are without langfuse prefix
+    # because they follow OpenTelemetry semantic conventions
     TRACE_USER_ID = "user.id"
     TRACE_SESSION_ID = "session.id"
     TRACE_INPUT = "langfuse.trace.input"
@@ -77,7 +79,7 @@ module Langfuse
     #
     def self.create_trace_attributes(attrs)
       # Convert to hash if it's a TraceAttributes object
-      attrs = normalize_attrs(attrs)
+      attrs = attrs.to_h
       get_value = ->(key) { get_hash_value(attrs, key) }
 
       attributes = {
@@ -88,7 +90,7 @@ module Langfuse
         RELEASE => get_value.call(:release),
         TRACE_INPUT => serialize(get_value.call(:input)),
         TRACE_OUTPUT => serialize(get_value.call(:output)),
-        TRACE_TAGS => get_value.call(:tags),
+        TRACE_TAGS => serialize(get_value.call(:tags)),
         ENVIRONMENT => get_value.call(:environment),
         TRACE_PUBLIC => get_value.call(:public),
         **flatten_metadata(get_value.call(:metadata), TRACE_METADATA)
@@ -116,7 +118,7 @@ module Langfuse
     #   otel_attrs = Langfuse::OtelAttributes.create_observation_attributes("generation", attrs)
     #
     def self.create_observation_attributes(type, attrs)
-      attrs = normalize_attrs(attrs)
+      attrs = attrs.to_h
       get_value = ->(key) { get_hash_value(attrs, key) }
 
       otel_attributes = build_observation_base_attributes(type, get_value)
@@ -129,16 +131,22 @@ module Langfuse
     # Safely serializes an object to JSON string
     #
     # @param obj [Object, nil] Object to serialize
-    # @return [String, nil] JSON string, original string, or nil if nil/undefined
+    # @param preserve_strings [Boolean] If true, preserves strings as-is; if false, JSON-serializes everything including strings
+    # @return [String, nil] JSON string, original string (if preserve_strings is true), or nil if nil/undefined
     #
-    # @example
+    # @example Always JSON-serialize (default)
     #   serialize({ key: "value" }) # => '{"key":"value"}'
-    #   serialize("already a string") # => "already a string"
+    #   serialize("string") # => '"string"'
     #   serialize(nil) # => nil
     #
-    def self.serialize(obj)
+    # @example Preserve strings
+    #   serialize("already a string", preserve_strings: true) # => "already a string"
+    #   serialize([1, 2, 3], preserve_strings: true) # => "[1,2,3]"
+    #
+    # @api private
+    def self.serialize(obj, preserve_strings: false)
       return nil if obj.nil?
-      return obj if obj.is_a?(String)
+      return obj if preserve_strings && obj.is_a?(String)
 
       begin
         obj.to_json
@@ -166,7 +174,7 @@ module Langfuse
 
       # Handle non-hash metadata (arrays, primitives, etc.)
       unless metadata.is_a?(Hash)
-        serialized = serialize(metadata)
+        serialized = serialize(metadata, preserve_strings: true)
         return serialized ? { prefix => serialized } : {}
       end
 
@@ -192,21 +200,14 @@ module Langfuse
       if value.is_a?(Hash)
         # Recursively flatten nested hashes
         flatten_metadata(value, key)
-      else
-        # Serialize non-hash values
-        serialized = serialize(value)
+      elsif value.is_a?(Array)
+        # Serialize arrays to JSON
+        serialized = serialize(value, preserve_strings: true)
         serialized ? { key => serialized } : {}
+      else
+        # Convert simple values (strings, numbers, booleans) to strings
+        { key => value.to_s }
       end
-    end
-
-    # Normalizes attributes to a hash (handles both objects and hashes)
-    #
-    # @param attrs [Object, Hash, nil] Attributes object or hash
-    # @return [Hash] Normalized hash
-    # @private
-    def self.normalize_attrs(attrs)
-      attrs = attrs.to_h if attrs.respond_to?(:to_h)
-      attrs || {}
     end
 
     # Gets a value from a hash supporting both symbol and string keys
@@ -250,16 +251,25 @@ module Langfuse
     # Adds prompt attributes if prompt is present and not a fallback
     #
     # @param otel_attributes [Hash] Attributes hash to modify
-    # @param prompt [Hash, nil] Prompt hash
+    # @param prompt [Hash, Object, nil] Prompt hash or object
     # @return [void]
     # @private
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def self.add_prompt_attributes(otel_attributes, prompt)
       return unless prompt
-      return if prompt[:is_fallback] || prompt["is_fallback"]
 
-      otel_attributes[OBSERVATION_PROMPT_NAME] = prompt[:name] || prompt["name"]
-      otel_attributes[OBSERVATION_PROMPT_VERSION] = prompt[:version] || prompt["version"]
+      # Handle hash-like prompts
+      if prompt.is_a?(Hash) || prompt.respond_to?(:[])
+        return if prompt[:is_fallback] || prompt["is_fallback"]
+
+        otel_attributes[OBSERVATION_PROMPT_NAME] = prompt[:name] || prompt["name"]
+        otel_attributes[OBSERVATION_PROMPT_VERSION] = prompt[:version] || prompt["version"]
+      # Handle objects with name/version methods (already converted in Trace#generation)
+      elsif prompt.respond_to?(:name) && prompt.respond_to?(:version)
+        otel_attributes[OBSERVATION_PROMPT_NAME] = prompt.name
+        otel_attributes[OBSERVATION_PROMPT_VERSION] = prompt.version
+      end
     end
   end
-  # rubocop:enable Metrics/ModuleLength
+  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/ModuleLength
 end

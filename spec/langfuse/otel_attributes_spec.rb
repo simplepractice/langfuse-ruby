@@ -43,30 +43,60 @@ RSpec.describe Langfuse::OtelAttributes do
       expect(described_class.serialize(nil)).to be_nil
     end
 
-    it "returns strings as-is" do
-      expect(described_class.serialize("test string")).to eq("test string")
-    end
-
-    it "serializes arrays to JSON" do
-      result = described_class.serialize([1, 2, 3])
-      expect(result).to eq("[1,2,3]")
-    end
-
-    it "serializes complex nested objects" do
-      obj = { user: { id: 123, name: "Test" }, tags: %w[a b c] }
-      result = described_class.serialize(obj)
-      expect(result).to eq('{"user":{"id":123,"name":"Test"},"tags":["a","b","c"]}')
-    end
-
-    it "handles serialization errors gracefully" do
-      # Create an object that fails to serialize
-      obj = Object.new
-      def obj.to_json
-        raise StandardError, "Cannot serialize"
+    context "with default behavior (preserve_strings: false)" do
+      it "always JSON-serializes strings" do
+        expect(described_class.serialize("test string")).to eq('"test string"')
       end
 
-      result = described_class.serialize(obj)
-      expect(result).to be_nil
+      it "serializes arrays to JSON" do
+        result = described_class.serialize([1, 2, 3])
+        expect(result).to eq("[1,2,3]")
+      end
+
+      it "serializes complex nested objects" do
+        obj = { user: { id: 123, name: "Test" }, tags: %w[a b c] }
+        result = described_class.serialize(obj)
+        expect(result).to eq('{"user":{"id":123,"name":"Test"},"tags":["a","b","c"]}')
+      end
+
+      it "handles serialization errors gracefully" do
+        # Create an object that fails to serialize
+        obj = Object.new
+        def obj.to_json
+          raise StandardError, "Cannot serialize"
+        end
+
+        result = described_class.serialize(obj)
+        expect(result).to be_nil
+      end
+    end
+
+    context "with preserve_strings: true" do
+      it "returns strings as-is" do
+        expect(described_class.serialize("test string", preserve_strings: true)).to eq("test string")
+      end
+
+      it "serializes arrays to JSON" do
+        result = described_class.serialize([1, 2, 3], preserve_strings: true)
+        expect(result).to eq("[1,2,3]")
+      end
+
+      it "serializes complex nested objects" do
+        obj = { user: { id: 123, name: "Test" }, tags: %w[a b c] }
+        result = described_class.serialize(obj, preserve_strings: true)
+        expect(result).to eq('{"user":{"id":123,"name":"Test"},"tags":["a","b","c"]}')
+      end
+
+      it "handles serialization errors gracefully" do
+        # Create an object that fails to serialize
+        obj = Object.new
+        def obj.to_json
+          raise StandardError, "Cannot serialize"
+        end
+
+        result = described_class.serialize(obj, preserve_strings: true)
+        expect(result).to be_nil
+      end
     end
   end
 
@@ -146,7 +176,7 @@ RSpec.describe Langfuse::OtelAttributes do
         "langfuse.release" => "v1.0.0",
         "langfuse.trace.input" => '{"query":"test"}',
         "langfuse.trace.output" => '{"result":"success"}',
-        "langfuse.trace.tags" => %w[checkout payment],
+        "langfuse.trace.tags" => '["checkout","payment"]',
         "langfuse.trace.public" => false,
         "langfuse.environment" => "production"
       )

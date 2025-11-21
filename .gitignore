@@ -34,3 +34,6 @@ langfuse-python/
 
 # Environment variables
 *.env
+
+# Scripts directory used for development
+scripts/
