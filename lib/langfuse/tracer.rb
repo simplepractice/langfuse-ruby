@@ -48,7 +48,8 @@ module Langfuse
     # rubocop:disable Metrics/ParameterLists
     def trace(name:, user_id: nil, session_id: nil, input: nil, output: nil, metadata: nil, tags: nil, context: nil,
               &block)
-      attributes = build_trace_attributes(
+      attributes = OtelAttributes.create_trace_attributes(
+        name: name,
         user_id: user_id,
         session_id: session_id,
         input: input,
@@ -74,32 +75,6 @@ module Langfuse
     # @return [OpenTelemetry::SDK::Trace::Tracer]
     def default_tracer
       OpenTelemetry.tracer_provider.tracer("langfuse", Langfuse::VERSION)
-    end
-
-    # Build OTel attributes for a trace
-    #
-    # @param user_id [String, nil]
-    # @param session_id [String, nil]
-    # @param input [Object, nil]
-    # @param output [Object, nil]
-    # @param metadata [Hash, nil]
-    # @param tags [Array<String>, nil]
-    # @return [Hash]
-    def build_trace_attributes(user_id:, session_id:, input:, output:, metadata:, tags:)
-      attrs = {
-        "langfuse.user.id" => user_id,
-        "langfuse.session.id" => session_id,
-        "langfuse.trace.input" => input&.to_json,
-        "langfuse.trace.output" => output&.to_json,
-        "langfuse.trace.tags" => tags&.to_json
-      }.compact
-
-      # Add metadata as individual langfuse.trace.metadata.* attributes
-      metadata&.each do |key, value|
-        attrs["langfuse.trace.metadata.#{key}"] = value.to_s
-      end
-
-      attrs
     end
 
     # Wrap the user's block to inject a Trace object

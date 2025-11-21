@@ -16,30 +16,30 @@ module Langfuse
   #     }
   #   end
   #
-  class Generation
-    attr_reader :otel_span
-
-    # Initialize a new Generation wrapper
+  class Generation < BaseObservation
+    # Gets the observation type
     #
-    # @param otel_span [OpenTelemetry::SDK::Trace::Span] The underlying OTel span
-    def initialize(otel_span)
-      @otel_span = otel_span
+    # @return [String] Always returns "generation"
+    def type
+      "generation"
     end
 
-    # Set the output of this generation
+    # Updates this generation with new attributes
     #
-    # @param value [Object] The output value (will be JSON-encoded)
-    # @return [void]
+    # @param attrs [Hash, Types::GenerationAttributes] Generation attributes to set
+    # @return [self] Returns self for method chaining
     #
     # @example
-    #   gen.output = "Hello, how can I help you today?"
-    #
-    # @example with structured output
-    #   gen.output = { role: "assistant", content: "Hello!" }
-    #
-    def output=(value)
-      @otel_span.set_attribute("langfuse.observation.output", value.to_json)
+    #   generation.update(
+    #     output: { role: "assistant", content: "Hello!" },
+    #     usage_details: { prompt_tokens: 100, completion_tokens: 50 }
+    #   )
+    def update(attrs)
+      update_observation_attributes(attrs)
+      self
     end
+
+    # Convenience setters are inherited from BaseObservation
 
     # Set the usage statistics for this generation
     #
@@ -57,60 +57,33 @@ module Langfuse
     #   }
     #
     def usage=(value)
-      @otel_span.set_attribute("langfuse.observation.usage_details", value.to_json)
+      update_observation_attributes(usage_details: value)
     end
 
-    # Set metadata for this generation
+    # Set the model name for this generation
     #
-    # @param value [Hash] Metadata hash (expanded into individual langfuse.observation.metadata.* attributes)
+    # @param value [String] Model name (e.g., "gpt-4", "claude-3-opus")
     # @return [void]
     #
     # @example
-    #   gen.metadata = { finish_reason: "stop", model_version: "gpt-4-0613" }
+    #   gen.model = "gpt-4"
     #
-    def metadata=(value)
-      value.each do |key, val|
-        @otel_span.set_attribute("langfuse.observation.metadata.#{key}", val.to_s)
-      end
+    def model=(value)
+      update_observation_attributes(model: value)
     end
 
-    # Set the level of this generation
+    # Set the model parameters for this generation
     #
-    # @param value [String] Level (debug, default, warning, error)
+    # @param value [Hash] Model parameters (temperature, max_tokens, etc.)
     # @return [void]
     #
     # @example
-    #   gen.level = "warning" if response.finish_reason == "length"
+    #   gen.model_parameters = { temperature: 0.7, max_tokens: 100 }
     #
-    def level=(value)
-      @otel_span.set_attribute("langfuse.observation.level", value)
+    def model_parameters=(value)
+      update_observation_attributes(model_parameters: value)
     end
 
-    # Add an event to the generation
-    #
-    # @param name [String] Event name
-    # @param input [Object, nil] Optional event data
-    # @param level [String] Log level (debug, default, warning, error)
-    # @return [void]
-    #
-    # @example
-    #   gen.event(name: "streaming-started")
-    #   gen.event(name: "token-received", input: { token: "Hello" })
-    #
-    def event(name:, input: nil, level: "default")
-      attributes = {
-        "langfuse.observation.input" => input&.to_json,
-        "langfuse.observation.level" => level
-      }.compact
-
-      @otel_span.add_event(name, attributes: attributes)
-    end
-
-    # Access the underlying OTel span (for advanced users)
-    #
-    # @return [OpenTelemetry::SDK::Trace::Span]
-    def current_span
-      @otel_span
-    end
+    # Convenience setters are inherited from BaseObservation
   end
 end

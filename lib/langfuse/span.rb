@@ -15,16 +15,28 @@ module Langfuse
   #     end
   #   end
   #
-  class Span
-    attr_reader :otel_span, :otel_tracer
-
-    # Initialize a new Span wrapper
+  class Span < BaseObservation
+    # Gets the observation type
     #
-    # @param otel_span [OpenTelemetry::SDK::Trace::Span] The underlying OTel span
-    # @param otel_tracer [OpenTelemetry::SDK::Trace::Tracer] The OTel tracer
-    def initialize(otel_span, otel_tracer)
-      @otel_span = otel_span
-      @otel_tracer = otel_tracer
+    # @return [String] Always returns "span"
+    def type
+      "span"
+    end
+
+    # Updates this span with new attributes
+    #
+    # @param attrs [Hash, Types::SpanAttributes] Span attributes to set
+    # @return [self] Returns self for method chaining
+    #
+    # @example
+    #   span.update(
+    #     output: { result: "success" },
+    #     level: "DEFAULT",
+    #     metadata: { duration: 150 }
+    #   )
+    def update(attrs)
+      update_observation_attributes(attrs)
+      self
     end
 
     # Create a child span
@@ -43,18 +55,14 @@ module Langfuse
     #     nested_span.output = result
     #   end
     #
-    def span(name:, input: nil, metadata: nil, level: "default", &block)
-      attributes = build_span_attributes(
-        type: "span",
+    def span(name:, input: nil, metadata: nil, level: "default", &)
+      attrs = {
         input: input,
         metadata: metadata,
         level: level
-      )
+      }.compact
 
-      @otel_tracer.in_span(name, attributes: attributes) do |otel_span|
-        span_obj = Langfuse::Span.new(otel_span, @otel_tracer)
-        block.call(span_obj)
-      end
+      start_observation(name, attrs, as_type: :span, &)
     end
 
     # Create a generation (LLM call) span
@@ -76,137 +84,16 @@ module Langfuse
     #     gen.usage = { prompt_tokens: 100, completion_tokens: 50 }
     #   end
     #
-    def generation(name:, model:, input: nil, metadata: nil, model_parameters: nil, prompt: nil, &block)
-      attributes = build_generation_attributes(
+    def generation(name:, model:, input: nil, metadata: nil, model_parameters: nil, prompt: nil, &)
+      attrs = {
         model: model,
         input: input,
         metadata: metadata,
         model_parameters: model_parameters,
-        prompt: prompt
-      )
-
-      @otel_tracer.in_span(name, attributes: attributes) do |otel_span|
-        generation_obj = Langfuse::Generation.new(otel_span)
-        block.call(generation_obj)
-      end
-    end
-
-    # Add an event to the span
-    #
-    # @param name [String] Event name
-    # @param input [Object, nil] Optional event data
-    # @param level [String] Log level (debug, default, warning, error)
-    # @return [void]
-    #
-    # @example
-    #   span.event(name: "cache-hit", input: { key: "user:123" })
-    #
-    def event(name:, input: nil, level: "default")
-      attributes = {
-        "langfuse.observation.input" => input&.to_json,
-        "langfuse.observation.level" => level
+        prompt: normalize_prompt(prompt)
       }.compact
 
-      @otel_span.add_event(name, attributes: attributes)
-    end
-
-    # Set the output of this span
-    #
-    # @param value [Object] The output value (will be JSON-encoded)
-    # @return [void]
-    #
-    # @example
-    #   span.output = { results: [...], count: 42 }
-    #
-    def output=(value)
-      @otel_span.set_attribute("langfuse.observation.output", value.to_json)
-    end
-
-    # Set metadata for this span
-    #
-    # @param value [Hash] Metadata hash (expanded into individual langfuse.observation.metadata.* attributes)
-    # @return [void]
-    #
-    # @example
-    #   span.metadata = { source: "database", cache: "miss" }
-    #
-    def metadata=(value)
-      value.each do |key, val|
-        @otel_span.set_attribute("langfuse.observation.metadata.#{key}", val.to_s)
-      end
-    end
-
-    # Set the level of this span
-    #
-    # @param value [String] Level (debug, default, warning, error)
-    # @return [void]
-    #
-    # @example
-    #   span.level = "warning"
-    #
-    def level=(value)
-      @otel_span.set_attribute("langfuse.observation.level", value)
-    end
-
-    # Access the underlying OTel span (for advanced users)
-    #
-    # @return [OpenTelemetry::SDK::Trace::Span]
-    def current_span
-      @otel_span
-    end
-
-    private
-
-    # Build OTel attributes for a span
-    #
-    # @param type [String] Span type ("span" or "generation")
-    # @param input [Object, nil]
-    # @param metadata [Hash, nil]
-    # @param level [String]
-    # @return [Hash]
-    def build_span_attributes(type:, input:, metadata:, level:)
-      attrs = {
-        "langfuse.observation.type" => type,
-        "langfuse.observation.input" => input&.to_json,
-        "langfuse.observation.level" => level
-      }.compact
-
-      # Add metadata as individual langfuse.observation.metadata.* attributes
-      metadata&.each do |key, value|
-        attrs["langfuse.observation.metadata.#{key}"] = value.to_s
-      end
-
-      attrs
-    end
-
-    # Build OTel attributes for a generation
-    #
-    # @param model [String]
-    # @param input [Object, nil]
-    # @param metadata [Hash, nil]
-    # @param model_parameters [Hash, nil]
-    # @param prompt [Langfuse::TextPromptClient, Langfuse::ChatPromptClient, nil]
-    # @return [Hash]
-    def build_generation_attributes(model:, input:, metadata:, model_parameters:, prompt:)
-      attrs = {
-        "langfuse.observation.type" => "generation",
-        "langfuse.observation.model.name" => model,
-        "langfuse.observation.input" => input&.to_json,
-        "langfuse.observation.model.parameters" => model_parameters&.to_json
-      }.compact
-
-      # Add metadata as individual langfuse.observation.metadata.* attributes
-      metadata&.each do |key, value|
-        attrs["langfuse.observation.metadata.#{key}"] = value.to_s
-      end
-
-      # Auto-link prompt if provided
-      if prompt.respond_to?(:name) && prompt.respond_to?(:version)
-        attrs["langfuse.observation.prompt.name"] = prompt.name
-        attrs["langfuse.observation.prompt.version"] = prompt.version.to_i
-      end
-
-      attrs
+      start_observation(name, attrs, as_type: :generation, &)
     end
   end
 end

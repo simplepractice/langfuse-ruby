@@ -1,64 +1,75 @@
 # frozen_string_literal: true
 
 module Langfuse
-  # Wrapper around an OpenTelemetry span representing a Langfuse trace
+  # Trace observation representing the root of a Langfuse trace hierarchy.
   #
-  # Provides methods to create child spans and generations within a trace.
+  # Extends BaseObservation to provide trace-specific functionality and methods
+  # to create child spans and generations within a trace.
   #
-  # @example
+  # @example Block-based API (auto-ends)
   #   Langfuse.trace(name: "my-trace") do |trace|
   #     trace.span(name: "retrieval") do |span|
-  #       # Do work
+  #       span.output = {...}
   #     end
   #
   #     trace.generation(name: "llm-call", model: "gpt-4") do |gen|
-  #       # Call LLM
+  #       gen.output = {...}
   #     end
   #   end
   #
-  class Trace
-    attr_reader :otel_span, :otel_tracer
-
-    # Initialize a new Trace wrapper
+  # @example Stateful API (manual end)
+  #   trace = Langfuse.trace(name: "my-trace")
+  #   span = trace.span(name: "retrieval")
+  #   span.output = {...}
+  #   span.end
+  #
+  class Trace < BaseObservation
+    # Gets the observation type
     #
-    # @param otel_span [OpenTelemetry::SDK::Trace::Span] The underlying OTel span
-    # @param otel_tracer [OpenTelemetry::SDK::Trace::Tracer] The OTel tracer
-    def initialize(otel_span, otel_tracer)
-      @otel_span = otel_span
-      @otel_tracer = otel_tracer
+    # Overrides BaseObservation#type to return "trace" instead of reading from attributes.
+    #
+    # @return [String] Always returns "trace"
+    def type
+      "trace"
     end
 
     # Create a child span
+    #
+    # Supports both block-based (auto-ends) and stateful (manual end) APIs.
     #
     # @param name [String] Name of the span
     # @param input [Object, nil] Optional input data (will be JSON-encoded)
     # @param metadata [Hash, nil] Optional metadata
     # @param level [String] Log level (debug, default, warning, error)
-    # @yield [span] Yields the span object to the block
+    # @yield [span] Optional block that receives the span object
     # @yieldparam span [Langfuse::Span] The span object
-    # @return [Object] The return value of the block
+    # @return [Langfuse::Span, Object] The span object (or block return value if block given)
     #
-    # @example
+    # @example Block-based (auto-ends)
     #   trace.span(name: "database-query", input: { query: "SELECT ..." }) do |span|
     #     result = database.query(...)
     #     span.output = result
     #   end
     #
-    def span(name:, input: nil, metadata: nil, level: "default", &block)
-      attributes = build_span_attributes(
-        type: "span",
+    # @example Stateful (manual end)
+    #   span = trace.span(name: "database-query", input: { query: "SELECT ..." })
+    #   result = database.query(...)
+    #   span.output = result
+    #   span.end
+    #
+    def span(name:, input: nil, metadata: nil, level: "default", &)
+      attrs = {
         input: input,
         metadata: metadata,
         level: level
-      )
+      }.compact
 
-      @otel_tracer.in_span(name, attributes: attributes) do |otel_span|
-        span_obj = Langfuse::Span.new(otel_span, @otel_tracer)
-        block.call(span_obj)
-      end
+      start_observation(name, attrs, as_type: :span, &)
     end
 
     # Create a generation (LLM call) span
+    #
+    # Supports both block-based (auto-ends) and stateful (manual end) APIs.
     #
     # @param name [String] Name of the generation
     # @param model [String] Model name (e.g., "gpt-4", "claude-3-opus")
@@ -66,56 +77,135 @@ module Langfuse
     # @param metadata [Hash, nil] Optional metadata
     # @param model_parameters [Hash, nil] Optional model parameters (temperature, etc.)
     # @param prompt [Langfuse::TextPromptClient, Langfuse::ChatPromptClient, nil] Optional prompt for auto-linking
-    # @yield [generation] Yields the generation object to the block
+    # @yield [generation] Optional block that receives the generation object
     # @yieldparam generation [Langfuse::Generation] The generation object
-    # @return [Object] The return value of the block
+    # @return [Langfuse::Generation, Object] The generation object (or block return value if block given)
     #
-    # @example
+    # @example Block-based (auto-ends)
     #   trace.generation(name: "gpt4-call", model: "gpt-4") do |gen|
     #     response = openai.chat(...)
     #     gen.output = response.content
     #     gen.usage = { prompt_tokens: 100, completion_tokens: 50 }
     #   end
     #
-    def generation(name:, model:, input: nil, metadata: nil, model_parameters: nil, prompt: nil, &block)
-      attributes = build_generation_attributes(
+    # @example Stateful (manual end)
+    #   gen = trace.generation(name: "gpt4-call", model: "gpt-4")
+    #   response = openai.chat(...)
+    #   gen.output = response.content
+    #   gen.usage = { prompt_tokens: 100, completion_tokens: 50 }
+    #   gen.end
+    #
+    def generation(name:, model:, input: nil, metadata: nil, model_parameters: nil, prompt: nil, &)
+      attrs = {
         model: model,
         input: input,
         metadata: metadata,
         model_parameters: model_parameters,
-        prompt: prompt
-      )
+        prompt: normalize_prompt(prompt)
+      }.compact
 
-      @otel_tracer.in_span(name, attributes: attributes) do |otel_span|
-        generation_obj = Langfuse::Generation.new(otel_span)
-        block.call(generation_obj)
-      end
+      start_observation(name, attrs, as_type: :generation, &)
     end
 
-    # Add an event to the trace
+    # Updates this trace with new attributes
     #
-    # @param name [String] Event name
-    # @param input [Object, nil] Optional event data
-    # @param level [String] Log level (debug, default, warning, error)
+    # @param attrs [Hash, Types::TraceAttributes] Trace attributes to set
+    # @return [self] Returns self for method chaining
+    #
+    # @example
+    #   trace.update(
+    #     user_id: "user-123",
+    #     session_id: "session-456",
+    #     tags: ["production", "api-v2"],
+    #     metadata: { version: "2.1.0" }
+    #   )
+    def update(attrs)
+      update_trace(attrs)
+      self
+    end
+
+    # Set the user ID for this trace
+    #
+    # @param value [String] User identifier
     # @return [void]
     #
     # @example
-    #   trace.event(name: "user-feedback", input: { rating: "thumbs_up" })
+    #   trace.user_id = "user-123"
     #
-    def event(name:, input: nil, level: "default")
-      attributes = {
-        "langfuse.observation.input" => input&.to_json,
-        "langfuse.observation.level" => level
-      }.compact
-
-      @otel_span.add_event(name, attributes: attributes)
+    def user_id=(value)
+      update_trace(user_id: value)
     end
 
-    # Access the underlying OTel span (for advanced users)
+    # Set the session ID for this trace
     #
-    # @return [OpenTelemetry::SDK::Trace::Span]
-    def current_span
-      @otel_span
+    # @param value [String] Session identifier
+    # @return [void]
+    #
+    # @example
+    #   trace.session_id = "session-456"
+    #
+    def session_id=(value)
+      update_trace(session_id: value)
+    end
+
+    # Set tags for this trace
+    #
+    # @param value [Array<String>] Tags array
+    # @return [void]
+    #
+    # @example
+    #   trace.tags = ["production", "api-v2"]
+    #
+    def tags=(value)
+      update_trace(tags: value)
+    end
+
+    # Set the input of this trace
+    #
+    # Overrides BaseObservation#input= to set trace-level attributes instead of
+    # observation-level attributes. Trace-level input/output represent the overall
+    # workflow's input/output, while observation-level attributes (used by spans
+    # and generations) represent individual step inputs/outputs.
+    #
+    # @param value [Object] The input value (will be JSON-encoded)
+    # @return [void]
+    #
+    # @example
+    #   trace.input = { query: "What is Ruby?" }
+    #
+    def input=(value)
+      update_trace(input: value)
+    end
+
+    # Set the output of this trace
+    #
+    # Overrides BaseObservation#output= to set trace-level attributes instead of
+    # observation-level attributes. Trace-level input/output represent the overall
+    # workflow's input/output, while observation-level attributes (used by spans
+    # and generations) represent individual step inputs/outputs.
+    #
+    # @param value [Object] The output value (will be JSON-encoded)
+    # @return [void]
+    #
+    # @example
+    #   trace.output = { answer: "Ruby is a programming language" }
+    #
+    def output=(value)
+      update_trace(output: value)
+    end
+
+    # Set metadata for this trace
+    #
+    # Overrides BaseObservation#metadata= to set trace-level attributes.
+    #
+    # @param value [Hash] Metadata hash (expanded into individual langfuse.trace.metadata.* attributes)
+    # @return [void]
+    #
+    # @example
+    #   trace.metadata = { source: "api", cache: "miss" }
+    #
+    def metadata=(value)
+      update_trace(metadata: value)
     end
 
     # Inject W3C Trace Context headers for distributed tracing
@@ -130,98 +220,6 @@ module Langfuse
       carrier = {}
       OpenTelemetry.propagation.inject(carrier)
       carrier
-    end
-
-    # Set the input of this trace
-    #
-    # @param value [Object] The input value (will be JSON-encoded)
-    # @return [void]
-    #
-    # @example
-    #   trace.input = { query: "What is Ruby?" }
-    #
-    def input=(value)
-      @otel_span.set_attribute("langfuse.trace.input", value.to_json)
-    end
-
-    # Set the output of this trace
-    #
-    # @param value [Object] The output value (will be JSON-encoded)
-    # @return [void]
-    #
-    # @example
-    #   trace.output = { answer: "Ruby is a programming language" }
-    #
-    def output=(value)
-      @otel_span.set_attribute("langfuse.trace.output", value.to_json)
-    end
-
-    # Set metadata for this trace
-    #
-    # @param value [Hash] Metadata hash (expanded into individual langfuse.trace.metadata.* attributes)
-    # @return [void]
-    #
-    # @example
-    #   trace.metadata = { source: "api", cache: "miss" }
-    #
-    def metadata=(value)
-      value.each do |key, val|
-        @otel_span.set_attribute("langfuse.trace.metadata.#{key}", val.to_s)
-      end
-    end
-
-    private
-
-    # Build OTel attributes for a span
-    #
-    # @param type [String] Span type ("span" or "generation")
-    # @param input [Object, nil]
-    # @param metadata [Hash, nil]
-    # @param level [String]
-    # @return [Hash]
-    def build_span_attributes(type:, input:, metadata:, level:)
-      attrs = {
-        "langfuse.observation.type" => type,
-        "langfuse.observation.input" => input&.to_json,
-        "langfuse.observation.level" => level
-      }.compact
-
-      # Add metadata as individual langfuse.observation.metadata.* attributes
-      metadata&.each do |key, value|
-        attrs["langfuse.observation.metadata.#{key}"] = value.to_s
-      end
-
-      attrs
-    end
-
-    # Build OTel attributes for a generation
-    #
-    # @param model [String]
-    # @param input [Object, nil]
-    # @param metadata [Hash, nil]
-    # @param model_parameters [Hash, nil]
-    # @param prompt [Langfuse::TextPromptClient, Langfuse::ChatPromptClient, nil]
-    # @return [Hash]
-    def build_generation_attributes(model:, input:, metadata:, model_parameters:, prompt:)
-      attrs = {
-        "langfuse.observation.type" => "generation",
-        "langfuse.observation.model.name" => model,
-        "langfuse.observation.input" => input&.to_json,
-        "langfuse.observation.model.parameters" => model_parameters&.to_json
-      }.compact
-
-      # Add metadata as individual langfuse.observation.metadata.* attributes
-      metadata&.each do |key, value|
-        attrs["langfuse.observation.metadata.#{key}"] = value.to_s
-      end
-
-      # Auto-link prompt if provided
-      if prompt.respond_to?(:name) && prompt.respond_to?(:version)
-        attrs["langfuse.observation.prompt.name"] = prompt.name
-        attrs["langfuse.observation.prompt.version"] = prompt.version.to_i
-      end
-
-      attrs
     end
   end
 end
